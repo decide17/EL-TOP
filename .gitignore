@@ -1,0 +1,11 @@
+# Generated files
+Debug/
+Release/
+
+# Eclipse,VScode project files
+.settings/
+.vscode/
+.vs/
+
+# git commit template file
+.gitmessage.txt
