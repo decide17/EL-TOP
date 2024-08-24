@@ -11,7 +11,7 @@
 #include "main.h"
 #include <stdbool.h>
 
-#define INPUT_MAX_CH 2
+#define INPUT_MAX_CH 7
 #define OUTPUT_MAX_CH 9
 
 typedef struct {
@@ -36,6 +36,11 @@ typedef enum {
 typedef enum {
   WATER1,
   WATER2,
+  SDCARD_DETECT,
+  MAX31865_DRDY1,
+  MAX31865_DRDY2,
+  MAX31865_DRDY3,
+  MAX31865_DRDY4,
 } in_enum_t;
 
 typedef enum enOnOff {

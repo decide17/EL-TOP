@@ -16,15 +16,6 @@
 #define DIO_PORT_CLK_ENABLE __HAL_RCC_GPIOB_CLK_ENABLE
 #define SegmentNo 4
 
-//// TM1640
-//#define CLK_PORT GPIOA
-//#define DIO_PORT GPIOA
-//#define CLK_PIN GPIO_PIN_11
-//#define DIO_PIN GPIO_PIN_12
-//#define CLK_PORT_CLK_ENABLE __HAL_RCC_GPIOA_CLK_ENABLE
-//#define DIO_PORT_CLK_ENABLE __HAL_RCC_GPIOA_CLK_ENABLE
-//#define SegmentNo 3
-
 void _tm1637Start(void);
 void _tm1637Stop(void);
 void _tm1637ReadResult(void);
@@ -205,14 +196,6 @@ void tm1637LED(void) {
     _tm1637WriteByte(buf[it]);
     _tm1637ReadResult();
   }
-//  _tm1637WriteByte(0x01);
-//  _tm1637ReadResult();
-//  _tm1637WriteByte(0x02);
-//  _tm1637ReadResult();
-//  _tm1637WriteByte(0x04);
-//  _tm1637ReadResult();
-//  _tm1637WriteByte(0x08);
-//  _tm1637ReadResult();
   buf[0]++;
   buf[1]++;
   buf[2]++;

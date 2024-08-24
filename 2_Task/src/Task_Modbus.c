@@ -11,9 +11,8 @@
 #include "com_gpio.h"
 #include "database.h"
 
-#include "cmsis_os.h"
 osThreadId_t task_Modbus_Handle;
-const osThreadAttr_t taskModbus_attributes = { .name = "MODBUS Task", .stack_size = 512 * 4, .priority = (osPriority_t) osPriorityNormal, };
+const osThreadAttr_t taskModbus_attributes = { .name = "MODBUS Task", .stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
 
 MODBUS_SERIAL_FORMAT_t modbusReq;
 UART_DMA_RECEIVE_HANDLE_t modbusRxHndl;

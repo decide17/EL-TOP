@@ -57,6 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define DRDY_4_Pin GPIO_PIN_13
+#define DRDY_4_GPIO_Port GPIOC
+#define STB_1_Pin GPIO_PIN_14
+#define STB_1_GPIO_Port GPIOC
+#define STB_2_Pin GPIO_PIN_15
+#define STB_2_GPIO_Port GPIOC
 #define WATER_1_Pin GPIO_PIN_0
 #define WATER_1_GPIO_Port GPIOC
 #define WATER_2_Pin GPIO_PIN_1
@@ -73,18 +79,18 @@ void Error_Handler(void);
 #define RS485_TX_GPIO_Port GPIOA
 #define RS485_RD_Pin GPIO_PIN_4
 #define RS485_RD_GPIO_Port GPIOA
-#define IO_1_Pin GPIO_PIN_6
-#define IO_1_GPIO_Port GPIOA
-#define IO_2_Pin GPIO_PIN_7
-#define IO_2_GPIO_Port GPIOA
+#define SPI1_CS2_Pin GPIO_PIN_6
+#define SPI1_CS2_GPIO_Port GPIOA
+#define SPI1_CS3_Pin GPIO_PIN_7
+#define SPI1_CS3_GPIO_Port GPIOA
 #define A_PT_Pin GPIO_PIN_4
 #define A_PT_GPIO_Port GPIOC
 #define A_HT_Pin GPIO_PIN_5
 #define A_HT_GPIO_Port GPIOC
 #define BUZZER_Pin GPIO_PIN_0
 #define BUZZER_GPIO_Port GPIOB
-#define DRDY_Pin GPIO_PIN_1
-#define DRDY_GPIO_Port GPIOB
+#define SPI1_CS1_Pin GPIO_PIN_1
+#define SPI1_CS1_GPIO_Port GPIOB
 #define LIVE_Pin GPIO_PIN_2
 #define LIVE_GPIO_Port GPIOB
 #define CARD_DET_Pin GPIO_PIN_6
@@ -95,14 +101,20 @@ void Error_Handler(void);
 #define B_LL_HH_GPIO_Port GPIOC
 #define B_PT_Pin GPIO_PIN_9
 #define B_PT_GPIO_Port GPIOC
-#define IO_3_Pin GPIO_PIN_8
-#define IO_3_GPIO_Port GPIOA
-#define DIO_4_Pin GPIO_PIN_11
-#define DIO_4_GPIO_Port GPIOA
-#define CLK_4_Pin GPIO_PIN_12
+#define SPI1_CS4_Pin GPIO_PIN_8
+#define SPI1_CS4_GPIO_Port GPIOA
+#define CLK_4_Pin GPIO_PIN_11
 #define CLK_4_GPIO_Port GPIOA
+#define DIO_4_Pin GPIO_PIN_12
+#define DIO_4_GPIO_Port GPIOA
+#define DRDY_1_Pin GPIO_PIN_15
+#define DRDY_1_GPIO_Port GPIOA
 #define B_HT_Pin GPIO_PIN_10
 #define B_HT_GPIO_Port GPIOC
+#define DRDY_2_Pin GPIO_PIN_11
+#define DRDY_2_GPIO_Port GPIOC
+#define DRDY_3_Pin GPIO_PIN_12
+#define DRDY_3_GPIO_Port GPIOC
 #define CLK_3_Pin GPIO_PIN_8
 #define CLK_3_GPIO_Port GPIOB
 #define DIO_3_Pin GPIO_PIN_9

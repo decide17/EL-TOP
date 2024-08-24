@@ -25,9 +25,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "database.h"
 #include "Task_Cli.h"
 #include "Task_Input.h"
 #include "Task_Modbus.h"
+#include "Task_SdCard.h"
+#include "Task_Control.h"
+#include "Task_Remote.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,14 +97,30 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-//#ifdef _USE_CLI
-//  CLI_Create_Thread();
-//#endif
+
+  DataBaseInit();
 #ifdef _USE_INPUT
   INPUT_Create_Thread();
 #endif
+
+#ifdef _USE_REMOTE
+  REMOTE_Create_Thread();
+#endif
+
+#ifdef _USE_CONTROL
+  CONTROL_Create_Thread();
+#endif
+
 #ifdef _USE_MODBUS
   MODBUS_Create_Thread();
+#endif
+
+#ifdef _USE_SDCARD
+  SDCard_Create_Thread();
+#endif
+
+#ifdef _USE_CLI
+  CLI_Create_Thread();
 #endif
   /* USER CODE END RTOS_THREADS */
 

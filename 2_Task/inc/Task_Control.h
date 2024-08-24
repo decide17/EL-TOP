@@ -5,13 +5,12 @@
  *      Author: sjpark
  */
 
-#ifndef INC_INPUT_H_
-#define INC_INPUT_H_
+#ifndef INC_CONTROL_H_
+#define INC_CONTROL_H_
 #include "com_gpio.h"
-#include "com_adc.h"
 #include "cmsis_os.h"
 
-#define _USE_INPUT
+#define _USE_CONTROL
 
-void INPUT_Create_Thread(void);
+void CONTROL_Create_Thread(void);
 #endif /* INC_INPUT_H_ */

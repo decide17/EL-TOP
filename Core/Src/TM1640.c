@@ -88,7 +88,8 @@ void TM1640_WriteData(uint8_t oneByte) {
   for (uint8_t i = 0; i < 8; i++) {
     CLK(LOW);
 
-    if (oneByte & (1 << i)) {
+//    if (oneByte & (1 << i)) {
+    if ((oneByte >> i) & 0x01) {
       DIN(HIGH);
     } else {
       DIN(LOW);
@@ -127,9 +128,9 @@ void TM1640_display_byte(uint8_t Seg_N, uint8_t DispData) {
   TM1640_WriteData(DispData);		// отправляем "кодированные" данные для одного сегмента
   TM1640_Generate_STOP();
 
-//  TM1640_Generate_START();
-//  TM1640_WriteData(Cmd_DispCtrl);  // включаем дисплей с выставлленой яркостью;
-//  TM1640_Generate_STOP();
+  TM1640_Generate_START();
+  TM1640_WriteData(Cmd_DispCtrl);  // включаем дисплей с выставлленой яркостью;
+  TM1640_Generate_STOP();
 }
 //----------------------------------------------------------------------------------
 
@@ -148,7 +149,7 @@ void TM1640_displayOnOff(uint8_t OnOff) {
   TM1640_Generate_STOP();
 
   TM1640_Generate_START();
-  // для включения или выключения дисплея с сохранением текущей контрасности нужно ставить третий бит в 1 вкл 0 выкл
+// для включения или выключения дисплея с сохранением текущей контрасности нужно ставить третий бит в 1 вкл 0 выкл
   TM1640_WriteData(OnOff ? (Cmd_DispCtrl | 1 << 3) : (Cmd_DispCtrl & ~(1 << 3)));		// 0x80 выкл     0х88 вкл
   TM1640_Generate_STOP();
 }
@@ -244,7 +245,7 @@ void setPixel(int8_t y, int8_t x, uint8_t enabled) {
  */
 void drawSprite(const uint8_t *sprite, int x, int y, int width, int height) {
 
-  // The mask is used to get the column bit from the sprite row
+// The mask is used to get the column bit from the sprite row
   uint8_t mask = 0x80;
 
   for (int iy = 0; iy < height; iy++) {

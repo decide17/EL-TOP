@@ -10,6 +10,8 @@
 
 #include "cmsis_os.h"
 #include "com_uart.h"
+#include "stm32_ds3231.h"
+#include "mcp4728.h"
 
 #define _SW_VERSION_MAJOR 1
 #define _SW_VERSION_MINOR 0
@@ -89,6 +91,104 @@ typedef struct stSlotData {
   SYSTEM_REQUEST_t SystemRequest;
 } SLOT_DATA_t;
 
+typedef struct {
+  int16_t aMoTemp;
+  int16_t aBrTemp;
+  int16_t bMoTemp;
+  int16_t bBrTemp;
+  int16_t aHtOnTemp;
+  int16_t aHtOffTemp;
+  int16_t bHtOnTemp;
+  int16_t bHtOffTemp;
+} _TEMP_DATA;
+
+typedef struct {
+  uint8_t channel;
+  uint8_t rs485Id;
+  uint8_t rs485Bps;
+  uint8_t AutoReset;
+  uint8_t TripOnDelay;
+  int8_t aMoLineResAdj;
+  int8_t aBrLineResAdj;
+  int8_t bMoLineResAdj;
+  int8_t bBrLineResAdj;
+} _USER_DATA;
+
+typedef struct {
+  uint8_t sdFlag;
+} _SD_DATA;
+
+typedef struct {
+  int16_t a1_LowOffSet;
+  int16_t a1_HighOffSet;
+  int16_t a2_LowOffSet;
+  int16_t a2_HighOffSet;
+  int16_t b1_LowOffSet;
+  int16_t b1_HighOffSet;
+  int16_t b2_LowOffSet;
+  int16_t b2_HighOffSet;
+
+  uint16_t c1_LowOffSet;
+  uint16_t c1_HighOffSet;
+  uint16_t c2_LowOffSet;
+  uint16_t c2_HighOffSet;
+  uint16_t d1_LowOffSet;
+  uint16_t d1_HighOffSet;
+  uint16_t d2_LowOffSet;
+  uint16_t d2_HighOffSet;
+} _CALIBRATION_DATA;
+
+typedef struct {
+  uint16_t selectedSensorA;
+  int16_t aMeterCal;
+  uint16_t aStopMeterSet;
+  uint16_t aStartMeterSet;
+  uint16_t aUpLimitMeterSet;
+  uint16_t aDownLimitMeterSet;
+  uint16_t aPumpSwitchTimeSet;
+  uint16_t aPumpDelaySet;
+
+  uint16_t selectedSensorB;
+  int16_t bMeterCal;
+  uint16_t bStopMeterSet;
+  uint16_t bStartMeterSet;
+  uint16_t bUpLimitMeterSet;
+  uint16_t bDownLimitMeterSet;
+  uint16_t bPumpSwitchTimeSet;
+  uint16_t bPumpDelaySet;
+} _LEVEL_DATA;
+
+typedef enum enumREMOTE_Data {
+  INIT_VIEW,
+  STAND_BY,
+  USER_TEMP_SET,
+  SD_CARD_SET,
+  USER_CHANNEL_SELECTION,
+  FACTORY_CALIBRATION,
+  USER_LEVEL_SET,
+  A_B_L_H_SETCHK,
+  USER_MENU_SET,
+  RS485_SET,
+  RTC_SET,
+} REMOTE_SETTING_DATA_t;
+
+typedef struct {
+  REMOTE_SETTING_DATA_t setData;
+  uint32_t stepCnt;
+  uint8_t tempStep;
+  uint8_t remoteCnt;
+  int16_t read_data;
+} _REMOTE_DATA;
+
+typedef struct {
+  _REMOTE_DATA remoteData;
+  _TEMP_DATA tempData;
+  _USER_DATA userData;
+  _SD_DATA sdData;
+  _CALIBRATION_DATA calData;
+  _LEVEL_DATA levData;
+} SET_DATA_t;
+
 typedef enum enumFactory_Setting_Data {
   MANUFACTORING_DATE,
   SERIAL_NUMBER,
@@ -99,16 +199,116 @@ typedef enum enumFactory_Setting_Data {
   FACTORY_SETTING_LAST_DATA
 } FATORY_SETTING_DATA_t;
 
-//uint32_t DataBase_Get_pCAN_Data(void);
-//uint32_t DataBase_Get_pMySlot(void);
-//uint32_t DataBase_Get_pCAN_Charge(void);
-//uint32_t DataBase_Get_pCAN_Control(void);
-//uint32_t DataBase_Get_pAnnounce(void);
-//uint32_t DataBase_Get_pCAN_SlotInfo(void);
-//uint32_t DataBase_Get_Factory_Setting_Data_Address(FATORY_SETTING_DATA_t pos);
-//uint32_t DataBase_Get_pCharger_CAN_Data(void);
-uint32_t DataBase_Get_pMODBUS_Data(void);
+typedef union {
+  uint8_t BYTE_FIELD[3];
+  struct {
+    uint8_t Button_UP :1;      // 버튼 UP 키
+    uint8_t Button_DOWN :1;    // 버튼 DOWN 키
+    uint8_t Button_SET :1;     // 버튼 SET 키
+    uint8_t Button_RESET :1;   // 버튼 RESET 키
+    uint8_t RES1 :4;    //
+    uint8_t Button_UP_CHK :1;      // 버튼 UP OK
+    uint8_t Button_DOWN_CHK :1;    // 버튼 DOWN OK
+    uint8_t Button_SET_CHK :1;     // 버튼 SET OK
+    uint8_t Button_RESET_CHK :1;   // 버튼 RESET OK
+    uint8_t RES2 :4;    //
+    uint8_t Button_SET5s :1;    // SET 키 5초
+    uint8_t Button_UP_DN5s :1;    // 버튼 UP + DOWN 키 5초
+    uint8_t Button_SET_DN10s :1;    // 버튼 SET + DOWN 키 10초
+    uint8_t Button_SET_UP5s :1;    // 버튼 SET + UP 키 5초
+    uint8_t Button_UP5s :1;    // 버튼 UP 키 5초
+    uint8_t Button_UP10s :1;    // 버튼 UP 키 10초
+    uint8_t Button_DOWN5s :1;  // 버튼 DOWN 키 5초
+  } NAME_FIELD;
+} _BUTTON_STATUS;
 
-void DataBase_Init(void);
+typedef union {
+  uint8_t BYTE_FIELD[4];
+  struct {
+    uint8_t AMO_GREEN_TOGGLE :1;
+    uint8_t AMO_RED_TOGGLE :1;
+    uint8_t BMO_GREEN_TOGGLE :1;
+    uint8_t BMO_RED_TOGGLE :1;
+    uint8_t ALK_GREEN_TOGGLE :1;
+    uint8_t ALK_RED_TOGGLE :1;
+    uint8_t AHT_GREEN_TOGGLE :1;
+    uint8_t AHT_RED_TOGGLE :1;
+    uint8_t BHT_GREEN_TOGGLE :1;
+    uint8_t BHT_RED_TOGGLE :1;
+    uint8_t BLK_GREEN_TOGGLE :1;
+    uint8_t BLK_RED_TOGGLE :1;
+    uint8_t BBR_GREEN_TOGGLE :1;
+    uint8_t BBR_RED_TOGGLE :1;
+    uint8_t ABR_GREEN_TOGGLE :1;
+    uint8_t ABR_RED_TOGGLE :1;
+    uint8_t B_LH_GREEN_TOGGLE :1;
+    uint8_t B_LH_RED_TOGGLE :1;
+    uint8_t B_LL_GREEN_TOGGLE :1;
+    uint8_t B_LL_RED_TOGGLE :1;
+    uint8_t B_HH_GREEN_TOGGLE :1;
+    uint8_t B_HH_RED_TOGGLE :1;
+    uint8_t B_PC_GREEN_TOGGLE :1;
+    uint8_t B_PC_RED_TOGGLE :1;
+    uint8_t A_LH_GREEN_TOGGLE :1;
+    uint8_t A_LH_RED_TOGGLE :1;
+    uint8_t A_LL_GREEN_TOGGLE :1;
+    uint8_t A_LL_RED_TOGGLE :1;
+    uint8_t A_HH_GREEN_TOGGLE :1;
+    uint8_t A_HH_RED_TOGGLE :1;
+    uint8_t A_PC_GREEN_TOGGLE :1;
+    uint8_t A_PC_RED_TOGGLE :1;
+  } NAME_FIELD;
+} _SETTING_STATUS;
+
+typedef union {
+  uint8_t BYTE_FIELD[3];
+  struct {
+    uint8_t sdCardDetect :1;  // sd카드 인식
+    uint8_t waterSen1 :1;     // 수위센서 1
+    uint8_t waterSen2 :1;     // 수위센서 2
+    uint8_t max31865_drdy1 :1;  // max chip drdy
+    uint8_t max31865_drdy2 :1;  // max chip drdy
+    uint8_t max31865_drdy3 :1;  // max chip drdy
+    uint8_t max31865_drdy4 :1;  // max chip drdy
+    uint8_t res :1;
+    float levelVolt[2];
+  } NAME_FIELD;
+} _INPUT_STATUS;
+
+typedef struct {
+  _RTC rtc;
+  uint8_t rtcStep;
+  uint8_t errorCnt;
+  uint8_t rtcCnt;
+  float rtcTemp;
+  uint8_t rtcStatus;
+} _RTC_DATA;
+
+typedef struct {
+  float pt100[4];
+  uint8_t errorCnt[4];
+} _PT100_DATA;
+
+typedef struct {
+  dacChannelConfig mcp4728;
+} _DAC_DATA;
+
+typedef struct {
+  _BUTTON_STATUS buttonVaule;
+  _INPUT_STATUS inputValue;
+  _SETTING_STATUS setValue;
+  _PT100_DATA pt100Value;
+  _RTC_DATA rtcValue;
+  _DAC_DATA dacValue;
+} _SYSTEM_t;
+
+uint32_t DataBase_Get_pMODBUS_Data(void);
+uint32_t DataBase_Get_pInfo_Data(void);
+uint32_t DataBase_Get_Setting_Data(void);
+void TempSettingDataFlashSave(void);
+void LevelSettingDataFlashSave(void);
+void UserSettingDataFlashSave(void);
+void CalSettingDataFlashSave(void);
+void DataBaseInit(void);
 
 #endif /* INC_DATABASE_H_ */
