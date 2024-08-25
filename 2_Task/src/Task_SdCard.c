@@ -14,7 +14,6 @@
 static void clicard(uint8_t argc, const char **argv);
 #endif
 
-//_RTC rtc = { .Year = 24, .Month = 7, .Date = 20, .DaysOfWeek = SATURDAY, .Hour = 14, .Min = 02, .Sec = 00 };
 FRESULT res;
 FATFS SDFatFs;
 FIL MyFile;
