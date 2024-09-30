@@ -16,36 +16,42 @@
 #define _USE_MODBUS
 
 typedef struct {
-  uint16_t ID;
   uint16_t FWVersionMajor;
   uint16_t FWVersionMinor;
   uint16_t FWVersionPatch;
+  uint16_t InputStatus;
+  int16_t Pt100Value[4];
+  int16_t LevelSensor[2];
+  uint16_t Reserved_1[4];
   uint16_t Year;
   uint16_t Month;
+  uint16_t Week;
   uint16_t Day;
   uint16_t Hour;
   uint16_t Minute;
   uint16_t Second;
-  uint16_t InputStatus;
-  int16_t Temperature;
-  uint16_t Humidity;
-  uint16_t Reserved_1;
+  int16_t tempData[8];
+  int16_t userData[10];
+  int16_t calData[12];
+  int16_t levelData[16];
+  uint16_t Reserved_2[4];
 } MODBUS_CONTROL_t;
 
-typedef struct {
-  uint16_t Heater1_control;
-//  uint16_t Fan1_control;
-//  uint16_t Heater2_control;
-//  uint16_t Fan2_control;
-//  uint16_t Reset_control;
-//  uint16_t Reserved_2;
-//  uint16_t Set_Year;
-//  uint16_t Set_Month;
-//  uint16_t Set_Day;
-//  uint16_t Set_Hour;
-//  uint16_t Set_Minute;
-//  uint16_t Set_Second;
-} MODBUS_CONTROL_CMD_t;
+//typedef struct {
+//
+////  uint16_t Heater1_control;
+////  uint16_t Fan1_control;
+////  uint16_t Heater2_control;
+////  uint16_t Fan2_control;
+////  uint16_t Reset_control;
+////  uint16_t Reserved_2;
+////  uint16_t Set_Year;
+////  uint16_t Set_Month;
+////  uint16_t Set_Day;
+////  uint16_t Set_Hour;
+////  uint16_t Set_Minute;
+////  uint16_t Set_Second;
+//} MODBUS_CONTROL_CMD_t;
 
 #pragma pack(push, 1)
 typedef struct {
@@ -83,7 +89,7 @@ enum {
 
 typedef struct {
   MODBUS_CONTROL_t Control;
-  MODBUS_CONTROL_CMD_t Control_CMD;
+//  MODBUS_CONTROL_CMD_t Control_CMD;
   MODBUS_MAP_INFO_t AddrInfo[END_MAP];
 } MODBUS_MAP_t;
 

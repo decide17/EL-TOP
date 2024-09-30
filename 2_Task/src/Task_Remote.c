@@ -4,11 +4,15 @@
  *  Created on: Aug 24, 2024
  *      Author: USER
  */
+#include "stdbool.h"
 #include "database.h"
 #include "Task_Input.h"
 #include "Task_Cli.h"
 #include "com_flash.h"
 #include "tm1639.h"
+#include "User_Temp_Set.h"
+#include "User_Level_Set.h"
+#include "Factory_Calibration.h"
 
 #define IO4_AB_MO_FND 0
 #define IO4_B_LEVEL_FND 1
@@ -20,7 +24,7 @@ static void cliRemote(uint8_t argc, const char **argv);
 #endif
 
 osThreadId_t task_Remote_Handle;
-const osThreadAttr_t taskRemote_attributes = { .name = "Remote Thread", .stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
+const osThreadAttr_t taskRemote_attributes = { .name = "Remote Thread", .stack_size = 256 * 4, .priority = (osPriority_t) osPriorityAboveNormal, };
 
 osTimerId_t Buzzer_ClearTimer_ID;
 #define CONTROL_TIMER_BUZZER_CLEAR             1
@@ -44,12 +48,16 @@ void BUZZER_Control(ONOFF_t on, uint16_t time) {
   }
 }
 
-void RESET_BUTTON(_SYSTEM_t *SystemData) {
+void RESET_BUTTON(SYSTEM_t *SystemData) {
   SystemData->buttonVaule.NAME_FIELD.Button_UP_CHK = 0;
   SystemData->buttonVaule.NAME_FIELD.Button_DOWN_CHK = 0;
   SystemData->buttonVaule.NAME_FIELD.Button_SET_CHK = 0;
   SystemData->buttonVaule.NAME_FIELD.Button_RESET_CHK = 0;
   SystemData->buttonVaule.BYTE_FIELD[2] = 0;
+  SystemData->buttonVaule.BYTE_FIELD[3] = 0;
+  SystemData->buttonVaule.BYTE_FIELD[4] = 0;
+//  SystemData->setValue.BYTE_FIELD
+  memset(&SystemData->setValue, 0, sizeof(SystemData->setValue));
 }
 
 int circularValue(int max, int min, int value) {
@@ -62,8 +70,8 @@ int circularValue(int max, int min, int value) {
   }
 }
 
-void channel_display(SET_DATA_t *ELTop) {
-  switch (ELTop->remoteData.read_data) {
+void channel_display(SET_DATA_t *pELTop) {
+  switch (pELTop->remoteData.read_data) {
     case 0:
       tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A- ");
       break;
@@ -75,20 +83,20 @@ void channel_display(SET_DATA_t *ELTop) {
       break;
     default:
       tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "nuh");
-      ELTop->userData.channel = 0;
-      ELTop->remoteData.read_data = ELTop->userData.channel;
+      pELTop->userData.channel = 0;
+      pELTop->remoteData.read_data = pELTop->userData.channel;
       break;
   }
 }
-
-void led_Control(_SYSTEM_t *pSystem, SET_DATA_t *ELTop) {
+uint8_t displayCase = 0;
+uint8_t displayCnt = 0;
+void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   static uint8_t ledStep = 0;
   static uint32_t pre_time;
-  if (ELTop->remoteData.setData == STAND_BY || ELTop->remoteData.setData == INIT_VIEW) {
+
+  if (pELTop->remoteData.setData == STAND_BY) {
     switch (ledStep) {
       case 0:
-        pSystem->setValue.NAME_FIELD.BMO_GREEN_TOGGLE = 1;
-        pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
         pre_time = HAL_GetTick();
         ledStep++;
         break;
@@ -99,26 +107,338 @@ void led_Control(_SYSTEM_t *pSystem, SET_DATA_t *ELTop) {
               tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
             else
               tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
-            tm1639Display_led(&tm1639_io4);
-
-            pre_time = HAL_GetTick();
           } else if (pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE) {
-            if (tm1639_io4.data.NAME_FIELD.LED1_RED)
+            if (tm1639_io4.data.NAME_FIELD.LED1_RED) {
               tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
-            else
+            } else {
               tm1639_io4.data.NAME_FIELD.LED1_RED = 1;
-            tm1639Display_led(&tm1639_io4);
-
-            pre_time = HAL_GetTick();
+            }
           }
           if (pSystem->setValue.NAME_FIELD.BMO_GREEN_TOGGLE) {
             if (tm1639_io4.data.NAME_FIELD.LED2_GREEN)
               tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
             else
               tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
-            tm1639Display_led(&tm1639_io4);
-
-            pre_time = HAL_GetTick();
+          } else if (pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED2_RED) {
+              tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+            } else {
+              tm1639_io4.data.NAME_FIELD.LED2_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.ALK_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED3_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED3_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED3_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.ALK_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED3_RED) {
+              tm1639_io4.data.NAME_FIELD.LED3_RED = 0;
+            } else {
+              tm1639_io4.data.NAME_FIELD.LED3_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.AHT_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED4_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED4_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED4_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.AHT_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED4_RED)
+              tm1639_io4.data.NAME_FIELD.LED4_RED = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED4_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.B_LH_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED5_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED5_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED5_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.B_LH_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED5_RED)
+              tm1639_io4.data.NAME_FIELD.LED5_RED = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED5_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.B_LL_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED6_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED6_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED6_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.B_LL_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED6_RED) {
+              tm1639_io4.data.NAME_FIELD.LED6_RED = 0;
+            } else {
+              tm1639_io4.data.NAME_FIELD.LED6_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.B_HH_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED7_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED7_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED7_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.B_HH_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED7_RED) {
+              tm1639_io4.data.NAME_FIELD.LED7_RED = 0;
+            } else {
+              tm1639_io4.data.NAME_FIELD.LED7_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.B_PC_GREEN_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED8_GREEN)
+              tm1639_io4.data.NAME_FIELD.LED8_GREEN = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED8_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.B_PC_RED_TOGGLE) {
+            if (tm1639_io4.data.NAME_FIELD.LED8_RED)
+              tm1639_io4.data.NAME_FIELD.LED8_RED = 0;
+            else
+              tm1639_io4.data.NAME_FIELD.LED8_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.A_LH_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED1_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED1_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED1_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.A_LH_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED1_RED)
+              tm1639_io3.data.NAME_FIELD.LED1_RED = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED1_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.A_LL_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED2_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED2_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED2_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.A_LL_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED2_RED) {
+              tm1639_io3.data.NAME_FIELD.LED2_RED = 0;
+            } else {
+              tm1639_io3.data.NAME_FIELD.LED2_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.A_HH_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED3_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED3_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED3_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.A_HH_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED3_RED) {
+              tm1639_io3.data.NAME_FIELD.LED3_RED = 0;
+            } else {
+              tm1639_io3.data.NAME_FIELD.LED3_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.A_PC_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED4_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED4_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED4_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.A_PC_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED4_RED)
+              tm1639_io3.data.NAME_FIELD.LED4_RED = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED4_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.BHT_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED5_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED5_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED5_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.BHT_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED5_RED)
+              tm1639_io3.data.NAME_FIELD.LED5_RED = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED5_RED = 1;
+          }
+          if (pSystem->setValue.NAME_FIELD.BLK_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED6_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED6_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED6_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.BLK_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED6_RED) {
+              tm1639_io3.data.NAME_FIELD.LED6_RED = 0;
+            } else {
+              tm1639_io3.data.NAME_FIELD.LED6_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.BBR_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED7_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED7_RED) {
+              tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
+            } else {
+              tm1639_io3.data.NAME_FIELD.LED7_RED = 1;
+            }
+          }
+          if (pSystem->setValue.NAME_FIELD.ABR_GREEN_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED8_GREEN)
+              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+            else
+              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
+          } else if (pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE) {
+            if (tm1639_io3.data.NAME_FIELD.LED8_RED) {
+              tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+            } else {
+              tm1639_io3.data.NAME_FIELD.LED8_RED = 1;
+            }
+          }
+          pre_time = HAL_GetTick();
+          char read_str[10];
+          if (pELTop->userData.channel == 0) {
+            displayCase = 0;
+          } else if (pELTop->userData.channel == 1) {
+            displayCase = 1;
+          } else {
+            displayCnt++;
+            if (displayCnt > 4) {
+              displayCnt = 0;
+              displayCase ^= 1;
+            }
+          }
+          if (displayCase) {
+            if (pSystem->pt100Value.pt100Cal[2] < -99) {
+              tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+              pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
+            } else if (pSystem->pt100Value.pt100Cal[2] > 280) {
+              tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+              tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
+              pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
+            } else {
+//              if (pSystem->pt100Value.pt100Cal[2] >= pELTop->tempData.bMoTemp) {
+              if (pSystem->outputValue.NAME_FIELD.bMoFlag) {
+                tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+                pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
+              } else {
+                pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
+                tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+                tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
+              }
+            }
+            if (pSystem->pt100Value.pt100Cal[3] < -99) {
+              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+              pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
+            } else if (pSystem->pt100Value.pt100Cal[3] > 280) {
+              tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
+              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
+              pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
+            } else {
+//              if (pSystem->pt100Value.pt100Cal[3] >= pELTop->tempData.bBrTemp) {
+              if (pSystem->outputValue.NAME_FIELD.bBrFlag) {
+                tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+                pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
+              } else {
+                pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
+                tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
+                tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
+              }
+            }
+            tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+            tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+          } else {
+            if (pSystem->pt100Value.pt100Cal[0] < -99) {
+              tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+              pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
+            } else if (pSystem->pt100Value.pt100Cal[0] > 280) {
+              tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
+              tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
+              pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
+            } else {
+//              if (pSystem->pt100Value.pt100Cal[0] >= pELTop->tempData.aMoTemp) {
+              if (pSystem->outputValue.NAME_FIELD.aMoFlag) {
+                tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+                pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
+              } else {
+                pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
+                tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
+                tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
+              }
+            }
+            if (pSystem->pt100Value.pt100Cal[1] < -99) {
+              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+              pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
+            } else if (pSystem->pt100Value.pt100Cal[1] > 280) {
+              tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
+              pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
+            } else {
+//              if (pSystem->pt100Value.pt100Cal[1] >= pELTop->tempData.aBrTemp) {
+              if (pSystem->outputValue.NAME_FIELD.aBrFlag) {
+                tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+                pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
+              } else {
+                pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
+                tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+                tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
+              }
+            }
+            tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+            tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+          }
+          if (pSystem->pt100Value.pt100Cal[displayCase * 2] < -99) {
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Sht");
+          } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] < 280) {
+            if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 10) {
+              snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 100) {
+              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2] <= -1) {
+              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+            } else {
+              snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+            }
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, read_str);
+          } else {
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "---");
+          }
+          if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < -99) {
+            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "Sht");
+          } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 280) {
+            if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 10) {
+              snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 100) {
+              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] <= -1) {
+              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+            } else {
+              snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+            }
+            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str);
+          } else {
+            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
+          }
+          if (pELTop->userData.channel == 0) {
+            if (pSystem->adcValue.levelSensorCur[0] >= 4) {
+              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
+              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+            } else {
+              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
+            }
+          } else if (pELTop->userData.channel == 1) {
+            if (pSystem->adcValue.levelSensorCur[1] >= 4) {
+              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
+              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+            } else {
+              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
+            }
+          } else {
+            if (pSystem->adcValue.levelSensorCur[0] >= 4) {
+              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
+              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+            } else {
+              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
+            }
+            if (pSystem->adcValue.levelSensorCur[1] >= 4) {
+              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
+              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+            } else {
+              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
+            }
           }
         }
         break;
@@ -126,846 +446,728 @@ void led_Control(_SYSTEM_t *pSystem, SET_DATA_t *ELTop) {
   }
 }
 
-void con(_SYSTEM_t *pSystem, SET_DATA_t *ELTop) {
+void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   if (pSystem->buttonVaule.NAME_FIELD.Button_SET5s) {
+    pELTop->remoteData.remoteCnt = 200;
+    pELTop->remoteData.setData = USER_CHANNEL_SELECTION;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.setData = USER_CHANNEL_SELECTION;
-    ELTop->remoteData.read_data = ELTop->userData.channel;
-    channel_display(ELTop);
+    pELTop->remoteData.tempStep = 1;
+    pELTop->remoteData.read_data = pELTop->userData.channel;
+    channel_display(pELTop);
     RESET_BUTTON(pSystem);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-    Full_Reset(&tm1639_io3);
-    Full_Reset(&tm1639_io4);
-    BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = ELTop->tempData.aMoTemp;
-    tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
-    tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->remoteData.read_data);
-    cliPrintf("read_data : %d\n", ELTop->remoteData.read_data);
-    ELTop->remoteData.setData = USER_TEMP_SET;
-    RESET_BUTTON(pSystem);
+    UserTempStartFunc(pSystem, pELTop);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_DN5s) {
+    pELTop->remoteData.remoteCnt = 200;
+    pELTop->remoteData.setData = SD_CARD_SET;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->sdData.sdFlag = !ELTop->sdData.sdFlag;
-    ELTop->remoteData.stepCnt = 0;
-    ELTop->remoteData.setData = SD_CARD_SET;
+    if (pELTop->sdData.sdFlag) {
+      tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "SD-");
+      tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
+    } else {
+      tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "SD-");
+      tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
+    }
     RESET_BUTTON(pSystem);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_DN10s) {
-    Full_Reset(&tm1639_io3);
-    Full_Reset(&tm1639_io4);
-    BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = ELTop->calData.a1_LowOffSet;
-    cliPrintf("read_temp : %d, tempStep : %d \n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-    ELTop->remoteData.setData = FACTORY_CALIBRATION;
-    RESET_BUTTON(pSystem);
-    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A1L");
-    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+    FactoryCalibrationStartFunc(pSystem, pELTop);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_UP5s) {
+    UserLevelStartFunc(pSystem, pELTop);
+  } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP5chk) {
+    pELTop->remoteData.remoteCnt = 200;
+    pELTop->remoteData.setData = A_B_L_H_SETCHK;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = ELTop->levData.selectedSensorA;
-    cliPrintf("read_temp : %d, tempStep : %d \n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-    ELTop->remoteData.setData = USER_LEVEL_SET;
+    pELTop->remoteData.tempStep = 1;
+    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-L");
+    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStopMeterSet);
     RESET_BUTTON(pSystem);
-    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Asr");
-    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-  } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
+  } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN5chk) {
+    pELTop->remoteData.setData = RTC_SET;
+    pSystem->rtcValue.rtcStatus = 2;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    tm1639Display_num(&tm1639_io4, 0, ELTop->levData.aStopMeterSet);
-    tm1639Display_num(&tm1639_io4, 1, ELTop->levData.aStartMeterSet);
-    ELTop->remoteData.setData = A_B_L_H_SETCHK;
-    RESET_BUTTON(pSystem);
-  } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-    Full_Reset(&tm1639_io3);
-    Full_Reset(&tm1639_io4);
-    BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Year;
-    ELTop->remoteData.setData = RTC_SET;
-    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Y");
-    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+    pELTop->remoteData.tempStep = 1;
+    pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Year;
+    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Yer");
+    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN5s) {
+    pELTop->remoteData.remoteCnt = 200;
+    pELTop->remoteData.setData = USER_MENU_SET;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = ELTop->userData.AutoReset;
-    ELTop->remoteData.setData = USER_MENU_SET;
+    pELTop->remoteData.tempStep = 1;
+    pELTop->remoteData.read_data = pELTop->userData.AutoReset;
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "rSt");
-    if (ELTop->remoteData.read_data)
+    if (pELTop->remoteData.read_data)
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
     else
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP5s) {
+    pELTop->remoteData.remoteCnt = 200;
+    pELTop->remoteData.setData = RS485_SET;
     Full_Reset(&tm1639_io3);
     Full_Reset(&tm1639_io4);
     BUZZER_Control(ON, 100);
-    ELTop->remoteData.tempStep = 1;
-    ELTop->remoteData.read_data = ELTop->userData.rs485Id;
-    ELTop->remoteData.setData = RS485_SET;
+    pELTop->remoteData.tempStep = 1;
+    pELTop->remoteData.read_data = pELTop->userData.rs485Id;
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ID-");
-    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
+  } else if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
+    NVIC_SystemReset();
   }
+
+//  else if (pSystem->buttonVaule.NAME_FIELD.Button_RESET5s) {
+//    pELTop->remoteData.setData = HARDWARD_TEST;
+//    Full_Reset(&tm1639_io3);
+//    Full_Reset(&tm1639_io4);
+//    BUZZER_Control(ON, 100);
+//    pELTop->remoteData.tempStep = 1;
+//    pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[0];
+//    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA1");
+//    char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//    char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//    uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//    if (written < 0 || written >= sizeof(read_str1)) {
+//      memset(read_str1, 0, sizeof(read_str1));
+//    }
+//    snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//    tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//  }
+
 }
 
-void Remote_Control(_SYSTEM_t *pSystem, SET_DATA_t *ELTop) {
-//  SET_DATA_t *ELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
+void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
 
-  switch (ELTop->remoteData.setData) {
+  switch (pELTop->remoteData.setData) {
     case INIT_VIEW:
-      switch (ELTop->remoteData.tempStep) {
+      switch (pELTop->remoteData.tempStep) {
         case 0:
           tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "EL-");
           tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "TOP");
-          ELTop->remoteData.stepCnt = HAL_GetTick();
-          ELTop->remoteData.tempStep++;
+          pELTop->remoteData.stepCnt = HAL_GetTick();
+          pELTop->remoteData.tempStep++;
           break;
         case 1:
-          if (HAL_GetTick() - ELTop->remoteData.stepCnt >= 5000) {
+          if (HAL_GetTick() - pELTop->remoteData.stepCnt >= 3000) {
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ID-");
-            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->userData.rs485Id);
-            ELTop->remoteData.stepCnt = HAL_GetTick();
-            ELTop->remoteData.tempStep++;
+            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->userData.rs485Id);
+            pELTop->remoteData.stepCnt = HAL_GetTick();
+            pELTop->remoteData.tempStep++;
           }
           break;
         case 2:
-          if (HAL_GetTick() - ELTop->remoteData.stepCnt >= 5000) {
-            ELTop->remoteData.setData = STAND_BY;
-            ELTop->remoteData.stepCnt = 0;
-            ELTop->remoteData.tempStep = 0;
+          if (HAL_GetTick() - pELTop->remoteData.stepCnt >= 3000) {
+            pELTop->remoteData.stepCnt = HAL_GetTick();
+            BUZZER_Control(ON, 200);
+            FND_Reset(&tm1639_io3);
+            FND_Reset(&tm1639_io4);
+            pELTop->remoteData.tempStep++;
+          }
+          break;
+        case 3:
+          if (HAL_GetTick() - pELTop->remoteData.stepCnt >= 200) {
+            pELTop->remoteData.setData = STAND_BY;
+            pELTop->remoteData.stepCnt = 0;
+            pELTop->remoteData.tempStep = 0;
             FND_Reset(&tm1639_io3);
             FND_Reset(&tm1639_io4);
           }
           break;
       }
-      con(pSystem, ELTop);
+      firstSetup(pSystem, pELTop);
       break;
     case STAND_BY:
-      con(pSystem, ELTop);
+      firstSetup(pSystem, pELTop);
       break;
     case USER_MENU_SET:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.resetCnt = 0;
         BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
+        pELTop->remoteData.setData = STAND_BY;
         RESET_BUTTON(pSystem);
         Full_Reset(&tm1639_io3);
         Full_Reset(&tm1639_io4);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            ELTop->remoteData.read_data = circularValue(1, 0, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(1, 0, ++pELTop->remoteData.read_data);
             break;
           case 2:
-            ELTop->remoteData.read_data = circularValue(60, 0, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(60, 0, ++pELTop->remoteData.read_data);
             break;
           case 3:
           case 4:
           case 5:
           case 6:
-            ELTop->remoteData.read_data = circularValue(10, -50, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(10, -50, ++pELTop->remoteData.read_data);
             break;
         }
-
-        if (ELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io4, 0, ELTop->remoteData.read_data);
+        if (pELTop->remoteData.tempStep != 1)
+          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         else {
-          if (ELTop->remoteData.read_data)
+          if (pELTop->remoteData.read_data)
             tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
           else
             tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
         }
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 1:
-            ELTop->remoteData.read_data = circularValue(1, 0, --ELTop->remoteData.read_data);
-            break;
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 2:
-            ELTop->remoteData.read_data = circularValue(60, 0, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(60, 0, --pELTop->remoteData.read_data);
             break;
           case 3:
           case 4:
           case 5:
           case 6:
-            ELTop->remoteData.read_data = circularValue(10, -50, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(10, -50, --pELTop->remoteData.read_data);
             break;
         }
-        if (ELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-        else {
-          if (ELTop->remoteData.read_data)
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
-          else
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
-        }
+        if (pELTop->remoteData.tempStep != 1)
+          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 1:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "trd");
-            ELTop->userData.AutoReset = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.TripOnDelay;
+            pELTop->userData.AutoReset = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.TripOnDelay;
             break;
           case 2:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AJ1");
-            ELTop->userData.TripOnDelay = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.aMoLineResAdj;
+            pELTop->userData.TripOnDelay = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.aMoLineResAdj;
             break;
           case 3:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AJ2");
-            ELTop->userData.aMoLineResAdj = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.aBrLineResAdj;
+            pELTop->userData.aMoLineResAdj = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.aBrLineResAdj;
             break;
           case 4:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bJ1");
-            ELTop->userData.aBrLineResAdj = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.bMoLineResAdj;
+            pELTop->userData.aBrLineResAdj = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.bMoLineResAdj;
             break;
           case 5:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bJ2");
-            ELTop->userData.bMoLineResAdj = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.bBrLineResAdj;
+            pELTop->userData.bMoLineResAdj = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.bBrLineResAdj;
             break;
           case 6:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "rST");
-            ELTop->userData.bBrLineResAdj = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.AutoReset;
-            if (ELTop->remoteData.read_data)
+            pELTop->userData.bBrLineResAdj = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.AutoReset;
+            if (pELTop->remoteData.read_data)
               tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
             else
               tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
             break;
         }
         UserSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 6)
-          ELTop->remoteData.tempStep = 1;
+        pELTop->remoteData.tempStep++;
+        if (pELTop->remoteData.tempStep > 6)
+          pELTop->remoteData.tempStep = 1;
         RESET_BUTTON(pSystem);
         BUZZER_Control(ON, 100);
-        if (ELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        if (pELTop->remoteData.tempStep != 1)
+          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
+      } else if (pELTop->remoteData.resetCnt == 1) {
+        switch (pELTop->remoteData.tempStep) {
+          case 1:
+            pELTop->userData.AutoReset = pELTop->remoteData.read_data;
+            break;
+          case 2:
+            pELTop->userData.TripOnDelay = pELTop->remoteData.read_data;
+            break;
+          case 3:
+            pELTop->userData.aMoLineResAdj = pELTop->remoteData.read_data;
+            break;
+          case 4:
+            pELTop->userData.aBrLineResAdj = pELTop->remoteData.read_data;
+            break;
+          case 5:
+            pELTop->userData.bMoLineResAdj = pELTop->remoteData.read_data;
+            break;
+          case 6:
+            pELTop->userData.bBrLineResAdj = pELTop->remoteData.read_data;
+            break;
+        }
+        UserSettingDataFlashSave();
+        pELTop->remoteData.resetCnt = 0;
+        cliPrintf("STAND_BY Set\n");
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
       }
       break;
     case RS485_SET:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.resetCnt = 0;
         BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
+        pELTop->remoteData.setData = STAND_BY;
         RESET_BUTTON(pSystem);
         Full_Reset(&tm1639_io3);
         Full_Reset(&tm1639_io4);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            ELTop->remoteData.read_data = circularValue(64, 1, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(64, 1, ++pELTop->remoteData.read_data);
             break;
           case 2:
-            ELTop->remoteData.read_data = circularValue(3, 1, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(3, 1, ++pELTop->remoteData.read_data);
             break;
         }
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            ELTop->remoteData.read_data = circularValue(64, 1, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(64, 1, --pELTop->remoteData.read_data);
             break;
           case 2:
-            ELTop->remoteData.read_data = circularValue(3, 1, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(3, 1, --pELTop->remoteData.read_data);
             break;
         }
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
           case 1:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bPS");
-            ELTop->userData.rs485Id = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.rs485Bps;
+            pELTop->remoteData.read_data = pELTop->userData.rs485Bps;
+            RS485IdDataFlashSave(pELTop->remoteData.read_data);
             break;
           case 2:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ID-");
-            ELTop->userData.rs485Bps = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->userData.rs485Id;
+            pELTop->userData.rs485Bps = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pELTop->userData.rs485Id;
+            UserSettingDataFlashSave();
             break;
         }
-        UserSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 2)
-          ELTop->remoteData.tempStep = 1;
+        pELTop->remoteData.tempStep++;
+        if (pELTop->remoteData.tempStep > 2)
+          pELTop->remoteData.tempStep = 1;
         RESET_BUTTON(pSystem);
         BUZZER_Control(ON, 100);
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
+      } else if (pELTop->remoteData.resetCnt == 1) {
+        switch (pELTop->remoteData.tempStep) {
+          case 1:
+            RS485IdDataFlashSave(pELTop->remoteData.read_data);
+            break;
+          case 2:
+            pELTop->userData.rs485Bps = pELTop->remoteData.read_data;
+            UserSettingDataFlashSave();
+            break;
+        }
+        pELTop->remoteData.resetCnt = 0;
+        cliPrintf("STAND_BY Set\n");
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
       }
       break;
+//    case HARDWARD_TEST:
+//      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
+//        pELTop->remoteData.remoteCnt = 0;
+//        BUZZER_Control(ON, 100);
+//        pELTop->remoteData.setData = STAND_BY;
+//        RESET_BUTTON(pSystem);
+//        Full_Reset(&tm1639_io3);
+//        Full_Reset(&tm1639_io4);
+//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
+//        pELTop->remoteData.remoteCnt = 0;
+//        switch (pELTop->remoteData.tempStep) {
+//          case 1:
+//          case 2:
+//          case 3:
+//          case 4:
+//            pELTop->remoteData.read_data = circularValue(4095, 0, ++pELTop->remoteData.read_data);
+//            char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//            char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//            uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//          case 7:
+//            pELTop->remoteData.read_data = circularValue(59, 0, ++pELTop->remoteData.read_data);
+//            break;
+//        }
+//
+//        RESET_BUTTON(pSystem);
+//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
+//        pELTop->remoteData.remoteCnt = 0;
+//        switch (pELTop->remoteData.tempStep) {
+//          case 1:
+//          case 2:
+//          case 3:
+//          case 4:
+//            pELTop->remoteData.read_data = circularValue(4095, 0, (pELTop->remoteData.read_data + 100));
+//            char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//            char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//            uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//          case 7:
+//            pELTop->remoteData.read_data = circularValue(59, 0, --pELTop->remoteData.read_data);
+//            break;
+//        }
+//
+//        RESET_BUTTON(pSystem);
+//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
+//        char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//        char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//        uint8_t written;
+//        pELTop->remoteData.remoteCnt = 0;
+//        switch (pELTop->remoteData.tempStep) {
+//          case 1:
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA2");
+//            pSystem->dacValue.mcp4728.channel_Val[0] = pELTop->remoteData.read_data;
+//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[1];
+//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//          case 2:
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA3");
+//            pSystem->dacValue.mcp4728.channel_Val[1] = pELTop->remoteData.read_data;
+//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[2];
+//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//          case 3:
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA4");
+//            pSystem->dacValue.mcp4728.channel_Val[2] = pELTop->remoteData.read_data;
+//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[3];
+//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//          case 4:
+//            Full_Reset(&tm1639_io3);
+//            Full_Reset(&tm1639_io4);
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AD1");
+//            pSystem->dacValue.mcp4728.channel_Val[3] = pELTop->remoteData.read_data;
+//            sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
+//            pELTop->remoteData.stepCnt = HAL_GetTick();
+//            break;
+//          case 5:
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AD2");
+//            sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
+//            pELTop->remoteData.stepCnt = HAL_GetTick();
+//            break;
+//          case 6:
+//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA1");
+//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[0];
+//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
+//            if (written < 0 || written >= sizeof(read_str1)) {
+//              memset(read_str1, 0, sizeof(read_str1));
+//            }
+//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
+//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
+//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
+//            break;
+//        }
+//        pELTop->remoteData.tempStep++;
+//        if (pELTop->remoteData.tempStep > 6)
+//          pELTop->remoteData.tempStep = 1;
+//        RESET_BUTTON(pSystem);
+//        BUZZER_Control(ON, 100);
+//      } else {
+//        if (pELTop->remoteData.tempStep == 5 || pELTop->remoteData.tempStep == 6) {
+//          char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
+//          pELTop->remoteData.remoteCnt = 0;
+//          if (HAL_GetTick() - pELTop->remoteData.stepCnt >= 500) {
+//            if (pELTop->remoteData.tempStep == 5) {
+//              sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
+//              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
+//            } else if (pELTop->remoteData.tempStep == 6) {
+//              sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[1]);
+//              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
+//            }
+//            pELTop->remoteData.stepCnt = HAL_GetTick();
+//          }
+//        }
+//      }
+//      break;
     case A_B_L_H_SETCHK:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.resetCnt = 0;
         BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
+        pELTop->remoteData.setData = STAND_BY;
         RESET_BUTTON(pSystem);
         Full_Reset(&tm1639_io3);
         Full_Reset(&tm1639_io4);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        if (ELTop->remoteData.tempStep == 1) {
-          tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->levData.bStopMeterSet);
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->levData.bStartMeterSet);
-          BUZZER_Control(ON, 100);
-          ELTop->remoteData.setData = A_B_L_H_SETCHK;
-          RESET_BUTTON(pSystem);
-          ELTop->remoteData.tempStep = 0;
-        } else {
-          tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->levData.aStopMeterSet);
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->levData.aStartMeterSet);
-          BUZZER_Control(ON, 100);
-          ELTop->remoteData.setData = A_B_L_H_SETCHK;
-          RESET_BUTTON(pSystem);
-          ELTop->remoteData.tempStep = 1;
+        pELTop->remoteData.remoteCnt = 200;
+        switch (pELTop->remoteData.tempStep) {
+          case 1:
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-H");
+            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStartMeterSet);
+            pELTop->remoteData.tempStep++;
+            break;
+          case 2:
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-L");
+            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStopMeterSet);
+            pELTop->remoteData.tempStep++;
+            break;
+          case 3:
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-H");
+            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStartMeterSet);
+            pELTop->remoteData.tempStep++;
+            break;
+          case 4:
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-L");
+            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStopMeterSet);
+            pELTop->remoteData.tempStep = 1;
+            break;
         }
+        RESET_BUTTON(pSystem);
+      } else if (pELTop->remoteData.resetCnt == 1) {
+        pELTop->remoteData.resetCnt = 0;
+        cliPrintf("STAND_BY Set\n");
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
       }
       break;
     case SD_CARD_SET:
-      if (ELTop->remoteData.stepCnt >= 100) {
-        ELTop->remoteData.setData = STAND_BY;
-        ELTop->remoteData.stepCnt = 0;
-        FND_Reset(&tm1639_io3);
-        FND_Reset(&tm1639_io4);
-      } else {
-        if (ELTop->sdData.sdFlag) {
+      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
+        pELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.resetCnt = 0;
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        UserSettingDataFlashSave();
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
+      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
+        pELTop->remoteData.remoteCnt = 200;
+        pELTop->sdData.sdFlag = !pELTop->sdData.sdFlag;
+        if (pELTop->sdData.sdFlag) {
           tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "SD-");
           tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
         } else {
           tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "SD-");
           tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
         }
+      } else if (pELTop->remoteData.resetCnt == 1) {
+        pELTop->remoteData.resetCnt = 0;
+        cliPrintf("STAND_BY Set\n");
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
       }
-      ELTop->remoteData.stepCnt++;
       break;
     case RTC_SET:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
         pSystem->rtcValue.rtcStatus = 1;
-        ELTop->remoteData.remoteCnt = 0;
         BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
+        pELTop->remoteData.setData = STAND_BY;
         RESET_BUTTON(pSystem);
         Full_Reset(&tm1639_io3);
         Full_Reset(&tm1639_io4);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            ELTop->remoteData.read_data = circularValue(99, 0, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(99, 0, ++pELTop->remoteData.read_data);
             break;
           case 2:
-            ELTop->remoteData.read_data = circularValue(12, 1, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(12, 1, ++pELTop->remoteData.read_data);
             break;
           case 3:
-            ELTop->remoteData.read_data = circularValue(31, 1, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(31, 1, ++pELTop->remoteData.read_data);
             break;
           case 4:
-            ELTop->remoteData.read_data = circularValue(7, 1, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(7, 1, ++pELTop->remoteData.read_data);
             break;
           case 5:
-            ELTop->remoteData.read_data = circularValue(23, 0, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(23, 0, ++pELTop->remoteData.read_data);
             break;
           case 6:
           case 7:
-            ELTop->remoteData.read_data = circularValue(59, 0, ++ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(59, 0, ++pELTop->remoteData.read_data);
             break;
         }
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            ELTop->remoteData.read_data = circularValue(99, 0, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(99, 0, --pELTop->remoteData.read_data);
             break;
           case 2:
-            ELTop->remoteData.read_data = circularValue(12, 1, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(12, 1, --pELTop->remoteData.read_data);
             break;
           case 3:
-            ELTop->remoteData.read_data = circularValue(31, 1, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(31, 1, --pELTop->remoteData.read_data);
             break;
           case 4:
-            ELTop->remoteData.read_data = circularValue(7, 1, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(7, 1, --pELTop->remoteData.read_data);
             break;
           case 5:
-            ELTop->remoteData.read_data = circularValue(23, 0, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(23, 0, --pELTop->remoteData.read_data);
             break;
           case 6:
           case 7:
-            ELTop->remoteData.read_data = circularValue(59, 0, --ELTop->remoteData.read_data);
+            pELTop->remoteData.read_data = circularValue(59, 0, --pELTop->remoteData.read_data);
             break;
         }
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
+        switch (pELTop->remoteData.tempStep) {
           case 1:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "t");
-            pSystem->rtcValue.rtc.Year = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Month;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "NNo");
+            pSystem->rtcValue.rtc.Year = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Month;
             break;
           case 2:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "D");
-            pSystem->rtcValue.rtc.Month = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Date;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "day");
+            pSystem->rtcValue.rtc.Month = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Date;
             break;
           case 3:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "E");
-            pSystem->rtcValue.rtc.Date = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.DaysOfWeek;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "UUE");
+            pSystem->rtcValue.rtc.Date = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.DaysOfWeek;
             break;
           case 4:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "H");
-            pSystem->rtcValue.rtc.DaysOfWeek = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Hour;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Hor");
+            pSystem->rtcValue.rtc.DaysOfWeek = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Hour;
             break;
           case 5:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "i");
-            pSystem->rtcValue.rtc.Hour = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Min;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "NNI");
+            pSystem->rtcValue.rtc.Hour = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Min;
             break;
           case 6:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "S");
-            pSystem->rtcValue.rtc.Min = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Sec;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "SEc");
+            pSystem->rtcValue.rtc.Min = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Sec;
             break;
           case 7:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Y");
-            pSystem->rtcValue.rtc.Sec = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = pSystem->rtcValue.rtc.Year;
+            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Yer");
+            pSystem->rtcValue.rtc.Sec = pELTop->remoteData.read_data;
+            pELTop->remoteData.read_data = pSystem->rtcValue.rtc.Year;
             break;
         }
         TempSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 7)
-          ELTop->remoteData.tempStep = 1;
+        pELTop->remoteData.tempStep++;
+        if (pELTop->remoteData.tempStep > 7)
+          pELTop->remoteData.tempStep = 1;
         RESET_BUTTON(pSystem);
         BUZZER_Control(ON, 100);
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
+        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
       }
       break;
     case USER_TEMP_SET:
-      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
-        RESET_BUTTON(pSystem);
-        Full_Reset(&tm1639_io3);
-        Full_Reset(&tm1639_io4);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        if (ELTop->remoteData.tempStep <= 4)
-          ELTop->remoteData.read_data = circularValue(280, -20, ++ELTop->remoteData.read_data);
-        else
-          ELTop->remoteData.read_data = circularValue(50, 0, ++ELTop->remoteData.read_data);
-        cliPrintf("Button_UP_CHK read_data : %d tempStep : %d\n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-        if (ELTop->remoteData.tempStep % 2 == 1) {
-          Full_Reset(&tm1639_io3);
-          tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->remoteData.read_data);
-        } else {
-          Full_Reset(&tm1639_io4);
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-        }
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        if (ELTop->remoteData.tempStep <= 4)
-          ELTop->remoteData.read_data = circularValue(280, -20, --ELTop->remoteData.read_data);
-        else
-          ELTop->remoteData.read_data = circularValue(50, 0, --ELTop->remoteData.read_data);
-        cliPrintf("Button_DOWN_CHK read_data : %d, tempStep : %d\n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-        if (ELTop->remoteData.tempStep % 2 == 1) {
-          Full_Reset(&tm1639_io3);
-          tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->remoteData.read_data);
-        } else {
-          Full_Reset(&tm1639_io4);
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-        }
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 1:
-            ELTop->tempData.aMoTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.aBrTemp;
-            break;
-          case 2:
-            ELTop->tempData.aBrTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.bMoTemp;
-            break;
-          case 3:
-            ELTop->tempData.bMoTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.bBrTemp;
-            break;
-          case 4:
-            ELTop->tempData.bBrTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.aHtOnTemp;
-            break;
-          case 5:
-            ELTop->tempData.aHtOnTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.aHtOffTemp;
-            break;
-          case 6:
-            ELTop->tempData.aHtOffTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.bHtOnTemp;
-            break;
-          case 7:
-            ELTop->tempData.bHtOnTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.bHtOffTemp;
-            break;
-          case 8:
-            ELTop->tempData.bHtOffTemp = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->tempData.aMoTemp;
-            break;
-        }
-        TempSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 8)
-          ELTop->remoteData.tempStep = 1;
-        RESET_BUTTON(pSystem);
-        BUZZER_Control(ON, 100);
-        if (ELTop->remoteData.tempStep % 2 == 1) {
-          Full_Reset(&tm1639_io3);
-          tm1639Display_num(&tm1639_io4, IO4_AB_MO_FND, ELTop->remoteData.read_data);
-        } else {
-          Full_Reset(&tm1639_io4);
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-        }
-      }
+      UserTempSetFunc(pSystem, pELTop);
       break;
     case USER_CHANNEL_SELECTION:
       if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        if (ELTop->remoteData.read_data <= 1)
-          ELTop->remoteData.read_data++;
+        pELTop->remoteData.remoteCnt = 200;
+        if (pELTop->remoteData.read_data <= 1)
+          pELTop->remoteData.read_data++;
         else
-          ELTop->remoteData.read_data = 0;
-        channel_display(ELTop);
-        ELTop->remoteData.remoteCnt = 0;
+          pELTop->remoteData.read_data = 0;
+        channel_display(pELTop);
         BUZZER_Control(ON, 100);
         RESET_BUTTON(pSystem);
       } else if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->userData.channel = ELTop->remoteData.read_data;
+        pELTop->remoteData.remoteCnt = 0;
+        pELTop->remoteData.resetCnt = 0;
+        pELTop->userData.channel = pELTop->remoteData.read_data;
         UserSettingDataFlashSave();
-        ELTop->remoteData.remoteCnt = 0;
         BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
+        pELTop->remoteData.setData = STAND_BY;
         RESET_BUTTON(pSystem);
         FND_Reset(&tm1639_io3);
         FND_Reset(&tm1639_io4);
+      } else if (pELTop->remoteData.resetCnt == 1) {
+        pELTop->userData.channel = pELTop->remoteData.read_data;
+        UserSettingDataFlashSave();
+        pELTop->remoteData.resetCnt = 0;
+        cliPrintf("STAND_BY Set\n");
+        BUZZER_Control(ON, 100);
+        pELTop->remoteData.setData = STAND_BY;
+        RESET_BUTTON(pSystem);
+        Full_Reset(&tm1639_io3);
+        Full_Reset(&tm1639_io4);
       }
       break;
     case FACTORY_CALIBRATION:
-      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
-        RESET_BUTTON(pSystem);
-        Full_Reset(&tm1639_io3);
-        Full_Reset(&tm1639_io4);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        ELTop->remoteData.read_data = circularValue(999, 0, ++ELTop->remoteData.read_data);
-        cliPrintf("Button_UP_CHK read_data : %d tempStep : %d\n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-        tm1639Display_num(&tm1639_io4, 0, ELTop->remoteData.read_data);
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        ELTop->remoteData.read_data = circularValue(999, 0, --ELTop->remoteData.read_data);
-        cliPrintf("Button_DOWN_CHK read_data : %d, tempStep : %d\n", ELTop->remoteData.read_data, ELTop->remoteData.tempStep);
-        tm1639Display_num(&tm1639_io4, 0, ELTop->remoteData.read_data);
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 1:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A1H");
-            ELTop->calData.a1_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.a1_HighOffSet;
-            break;
-          case 2:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A2L");
-            ELTop->calData.a1_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.a2_LowOffSet;
-            break;
-          case 3:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A2H");
-            ELTop->calData.a2_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.a2_HighOffSet;
-            break;
-          case 4:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b1L");
-            ELTop->calData.a2_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.b1_LowOffSet;
-            break;
-          case 5:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b1H");
-            ELTop->calData.b1_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.b1_HighOffSet;
-            break;
-          case 6:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b2L");
-            ELTop->calData.b1_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.b2_LowOffSet;
-            break;
-          case 7:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b2H");
-            ELTop->calData.b2_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.b2_HighOffSet;
-            break;
-          case 8:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "c1L");
-            ELTop->calData.b2_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.c1_LowOffSet;
-            break;
-          case 9:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "c1H");
-            ELTop->calData.c1_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.c1_HighOffSet;
-            break;
-          case 10:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "c2L");
-            ELTop->calData.c1_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.c2_LowOffSet;
-            break;
-          case 11:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "c2H");
-            ELTop->calData.c2_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.c2_HighOffSet;
-            break;
-          case 12:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "d1L");
-            ELTop->calData.c2_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.d1_LowOffSet;
-            break;
-          case 13:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "d1H");
-            ELTop->calData.d1_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.d1_HighOffSet;
-            break;
-          case 14:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "d2L");
-            ELTop->calData.d1_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.d2_LowOffSet;
-            break;
-          case 15:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "d2H");
-            ELTop->calData.d2_LowOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.d2_HighOffSet;
-            break;
-          case 16:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A1L");
-            ELTop->calData.d2_HighOffSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->calData.a1_LowOffSet;
-            break;
-        }
-        CalSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 16)
-          ELTop->remoteData.tempStep = 1;
-        RESET_BUTTON(pSystem);
-        BUZZER_Control(ON, 100);
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-      }
-
+      FactoryCalibrationSetFunc(pSystem, pELTop);
       break;
     case USER_LEVEL_SET:
-      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        BUZZER_Control(ON, 100);
-        ELTop->remoteData.setData = STAND_BY;
-        RESET_BUTTON(pSystem);
-        Full_Reset(&tm1639_io3);
-        Full_Reset(&tm1639_io4);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 2:
-          case 10:
-            ELTop->remoteData.read_data = circularValue(100, -99, ++ELTop->remoteData.read_data);
-            break;
-          case 9:
-          case 1:
-          case 3:
-          case 4:
-          case 5:
-          case 6:
-          case 7:
-          case 11:
-          case 12:
-          case 13:
-          case 14:
-          case 15:
-            ELTop->remoteData.read_data = circularValue(999, 0, ++ELTop->remoteData.read_data);
-            break;
-          case 8:
-          case 16:
-            ELTop->remoteData.read_data = circularValue(180, 0, ++ELTop->remoteData.read_data);
-            break;
-        }
-        tm1639Display_num(&tm1639_io4, 0, ELTop->remoteData.read_data);
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 2:
-          case 10:
-            ELTop->remoteData.read_data = circularValue(100, -99, --ELTop->remoteData.read_data);
-            break;
-          case 9:
-          case 1:
-          case 3:
-          case 4:
-          case 5:
-          case 6:
-          case 7:
-          case 11:
-          case 12:
-          case 13:
-          case 14:
-          case 15:
-            ELTop->remoteData.read_data = circularValue(999, 0, --ELTop->remoteData.read_data);
-            break;
-          case 8:
-          case 16:
-            ELTop->remoteData.read_data = circularValue(180, 0, --ELTop->remoteData.read_data);
-            break;
-        }
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        ELTop->remoteData.remoteCnt = 0;
-        switch (ELTop->remoteData.tempStep) {
-          case 1:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ASr");
-            ELTop->levData.selectedSensorA = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aMeterCal;
-          case 2:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AoC");
-            ELTop->levData.aMeterCal = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aStopMeterSet;
-            break;
-          case 3:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-L");
-            ELTop->levData.aStopMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aStartMeterSet;
-            break;
-          case 4:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-H");
-            ELTop->levData.aStartMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aUpLimitMeterSet;
-            break;
-          case 5:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ALL");
-            ELTop->levData.aUpLimitMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aDownLimitMeterSet;
-            break;
-          case 6:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AHH");
-            ELTop->levData.aDownLimitMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aPumpSwitchTimeSet;
-            break;
-          case 7:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "APC");
-            ELTop->levData.aPumpSwitchTimeSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.aPumpDelaySet;
-            break;
-          case 8:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Adt");
-            ELTop->levData.aPumpDelaySet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.selectedSensorB;
-            break;
-          case 9:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bSr");
-            ELTop->levData.selectedSensorB = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bMeterCal;
-          case 10:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "boC");
-            ELTop->levData.bMeterCal = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bStopMeterSet;
-            break;
-          case 11:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-L");
-            ELTop->levData.bStopMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bStartMeterSet;
-            break;
-          case 12:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-H");
-            ELTop->levData.bStartMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bUpLimitMeterSet;
-            break;
-          case 13:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bLL");
-            ELTop->levData.bUpLimitMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bDownLimitMeterSet;
-            break;
-          case 14:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bHH");
-            ELTop->levData.bDownLimitMeterSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bPumpSwitchTimeSet;
-            break;
-          case 15:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bPC");
-            ELTop->levData.bPumpSwitchTimeSet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.bPumpDelaySet;
-            break;
-          case 16:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bdt");
-            ELTop->levData.bPumpDelaySet = ELTop->remoteData.read_data;
-            ELTop->remoteData.read_data = ELTop->levData.selectedSensorA;
-            break;
-        }
-        LevelSettingDataFlashSave();
-        ELTop->remoteData.tempStep++;
-        if (ELTop->remoteData.tempStep > 16)
-          ELTop->remoteData.tempStep = 1;
-        RESET_BUTTON(pSystem);
-        BUZZER_Control(ON, 100);
-        tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, ELTop->remoteData.read_data);
-      }
+      UserLevelSetFunc(pSystem, pELTop);
       break;
   }
-//  if (ELTop->remoteData.setData != STAND_BY && ELTop->remoteData.setData != INIT_VIEW) {
-//    if (ELTop->remoteData.remoteCnt > 50) {
-//      ELTop->remoteData.remoteCnt = 0;
-//      cliPrintf("STAND_BY Set\n");
-//      ELTop->remoteData.setData = STAND_BY;
-//      RESET_BUTTON(pSystem);
-//    } else
-//      ELTop->remoteData.remoteCnt++;
-//  }
 }
 
-bool buttonClickedInput(_SYSTEM_t *pSystem) {
+bool buttonClickedInput(SYSTEM_t *pSystem) {
   bool ret = false;
 
   tm1639_io3.button = buttonstatusTM1639(&tm1639_io3);
   tm1639_io4.button = buttonstatusTM1639(&tm1639_io4);
+  SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
 
   pSystem->buttonVaule.BYTE_FIELD[0] = (tm1639_io3.button & 0x03) | ((tm1639_io4.button & 0x03) << 2);
   static uint8_t button_step = 0;
   static uint8_t btn;
+  const uint32_t up_down_pressed_time = 50;
+  const uint32_t up_down_repeat_time = 20;
   const uint32_t pressed_time = 100;
   const uint32_t repeat_time = 50;
   static uint32_t pre_time;
@@ -980,20 +1182,56 @@ bool buttonClickedInput(_SYSTEM_t *pSystem) {
       break;
     case 1:
       if (btn == pSystem->buttonVaule.BYTE_FIELD[0] && btn) {
-        if (HAL_GetTick() - pre_time >= pressed_time) {
-          ret = true;  // 버튼 클릭됨
-          button_step = 2;
-          pre_time = HAL_GetTick();
+        if (btn == 0x09 && pELTop->remoteData.setData == FACTORY_CALIBRATION) {
+          if (HAL_GetTick() - pre_time >= pressed_time) {
+            ret = false;  // 버튼 클릭됨
+            button_step = 0;
+            pSystem->buttonVaule.NAME_FIELD.Button_SET_DN = 1;
+          }
+        } else if ((pSystem->buttonVaule.BYTE_FIELD[0] == 0x01) || (pSystem->buttonVaule.BYTE_FIELD[0] == 0x02)) {
+          if (pELTop->remoteData.setData == SD_CARD_SET || pELTop->remoteData.setData == USER_MENU_SET) {
+            if (HAL_GetTick() - pre_time >= pressed_time) {
+              ret = true;  // 버튼 클릭됨
+              button_step = 2;
+              pre_time = HAL_GetTick();
+            }
+          } else if (pELTop->remoteData.setData == A_B_L_H_SETCHK) {
+            if (HAL_GetTick() - pre_time >= pressed_time) {
+              ret = true;  // 버튼 클릭됨
+              button_step = 0;
+              pre_time = HAL_GetTick();
+            }
+          } else {
+            if (HAL_GetTick() - pre_time >= up_down_pressed_time) {
+              ret = true;  // 버튼 클릭됨
+              button_step = 2;
+              pre_time = HAL_GetTick();
+            }
+          }
+        } else {
+          if (HAL_GetTick() - pre_time >= pressed_time) {
+            ret = true;  // 버튼 클릭됨
+            button_step = 2;
+            pre_time = HAL_GetTick();
+          }
         }
+
       } else {
         button_step = 0;
       }
       break;
     case 2:
       if (btn == pSystem->buttonVaule.BYTE_FIELD[0] && btn) {
-        if (HAL_GetTick() - pre_time >= repeat_time) {
-          button_step = 1;
-          pre_time = HAL_GetTick();
+        if (((btn & pSystem->buttonVaule.BYTE_FIELD[0]) == 0x01) || ((btn & pSystem->buttonVaule.BYTE_FIELD[0]) == 0x02)) {
+          if (HAL_GetTick() - pre_time >= up_down_repeat_time) {
+            button_step = 1;
+            pre_time = HAL_GetTick();
+          }
+        } else {
+          if (HAL_GetTick() - pre_time >= repeat_time) {
+            button_step = 1;
+            pre_time = HAL_GetTick();
+          }
         }
       } else {
         button_step = 0;
@@ -1003,7 +1241,7 @@ bool buttonClickedInput(_SYSTEM_t *pSystem) {
   return ret;
 }
 
-uint8_t buttonGetInput(_SYSTEM_t *pSystem) {
+uint8_t buttonGetInput(SYSTEM_t *pSystem) {
   uint8_t ret = false;
 
   tm1639_io3.button = buttonstatusTM1639(&tm1639_io3);
@@ -1039,7 +1277,7 @@ uint8_t buttonGetInput(_SYSTEM_t *pSystem) {
     case 2:
       if (btn == pSystem->buttonVaule.BYTE_FIELD[0]) {
         ret = 1;  // 버튼 클릭됨
-        if (btn == 0x03 || btn == 0x04 || btn == 0x05 || btn == 0x02 || btn == 0x01) {
+        if (btn == 0x01 || btn == 0x02 || btn == 0x03 || btn == 0x04 || btn == 0x08 || btn == 0x09 || btn == 0x0A) {
           if (HAL_GetTick() - pre_time >= continuousInput5s) {
             ret = 2;  // 버튼 클릭됨
             pre_time = HAL_GetTick();
@@ -1052,6 +1290,12 @@ uint8_t buttonGetInput(_SYSTEM_t *pSystem) {
         } else {
           button_step = 0;
         }
+      } else if ((btn == 0x01 && 0x03 == pSystem->buttonVaule.BYTE_FIELD[0]) || (btn == 0x02 && 0x03 == pSystem->buttonVaule.BYTE_FIELD[0])
+          || (btn == 0x01 && 0x09 == pSystem->buttonVaule.BYTE_FIELD[0]) || (btn == 0x08 && 0x09 == pSystem->buttonVaule.BYTE_FIELD[0])
+          || (btn == 0x02 && 0x0A == pSystem->buttonVaule.BYTE_FIELD[0]) || (btn == 0x08 && 0x0A == pSystem->buttonVaule.BYTE_FIELD[0])) {
+        btn = pSystem->buttonVaule.BYTE_FIELD[0];
+        pre_time = HAL_GetTick();
+        ret = 1;
       } else {
         button_step = 0;
       }
@@ -1061,8 +1305,8 @@ uint8_t buttonGetInput(_SYSTEM_t *pSystem) {
 }
 
 void Remote_Task(void *argument) {
-  _SYSTEM_t *pSystem = (_SYSTEM_t*) DataBase_Get_pInfo_Data();
-  SET_DATA_t *ELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
+  SYSTEM_t *pSystem = (SYSTEM_t*) DataBase_Get_pInfo_Data();
+  SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
   Buzzer_ClearTimer_ID = osTimerNew(Control_Oneshot_Timer_Callback, osTimerOnce, (void*) CONTROL_TIMER_BUZZER_CLEAR, NULL);
   bool ret;
   uint8_t res;
@@ -1092,34 +1336,53 @@ void Remote_Task(void *argument) {
   initTM1639(&tm1639_io4);
 
   while (1) {
-    if (ELTop->remoteData.setData == STAND_BY || ELTop->remoteData.setData == INIT_VIEW || pSystem->buttonVaule.NAME_FIELD.RES2) {
+    if (pELTop->remoteData.setData == STAND_BY || pELTop->remoteData.setData == INIT_VIEW || pSystem->buttonVaule.NAME_FIELD.RES2) {
       res = buttonGetInput(pSystem);
       if (res == 1) {
         pSystem->buttonVaule.NAME_FIELD.RES2 = (tm1639_io3.button & 0x03) | ((tm1639_io4.button & 0x03) << 2);
       } else if (res == 2) {
         switch (pSystem->buttonVaule.BYTE_FIELD[0]) {
-          case 0x04:
+          case 0x08:
             pSystem->buttonVaule.NAME_FIELD.Button_SET5s = 1;
             break;
           case 0x03:
             pSystem->buttonVaule.NAME_FIELD.Button_UP_DN5s = 1;
             break;
-          case 0x06:
+          case 0x09:
             pSystem->buttonVaule.NAME_FIELD.Button_SET_DN10s = 1;
             break;
-          case 0x05:
+          case 0x0A:
             pSystem->buttonVaule.NAME_FIELD.Button_SET_UP5s = 1;
             break;
-          case 0x02:
+          case 0x01:
             pSystem->buttonVaule.NAME_FIELD.Button_DOWN5s = 1;
             break;
-          case 0x01:
+          case 0x02:
             pSystem->buttonVaule.NAME_FIELD.Button_UP5s = 1;
+            break;
+          case 0x04:
+            pSystem->buttonVaule.NAME_FIELD.Button_RESET5s = 1;
             break;
         }
       } else {
-        if (ELTop->remoteData.setData == STAND_BY || ELTop->remoteData.setData == INIT_VIEW) {
+        if (pELTop->remoteData.setData == STAND_BY || pELTop->remoteData.setData == INIT_VIEW) {
           pSystem->buttonVaule.BYTE_FIELD[1] = pSystem->buttonVaule.NAME_FIELD.RES2;
+          if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK == 1) {
+            pSystem->buttonVaule.NAME_FIELD.Button_DOWNcnt++;
+            pSystem->buttonVaule.NAME_FIELD.RES2 = 0;
+            if (pSystem->buttonVaule.NAME_FIELD.Button_DOWNcnt >= 5) {
+              pSystem->buttonVaule.NAME_FIELD.Button_DOWNcnt = 0;
+              pSystem->buttonVaule.NAME_FIELD.Button_DOWN5chk = 1;
+            }
+          }
+          if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK == 1) {
+            pSystem->buttonVaule.NAME_FIELD.Button_UPcnt++;
+            pSystem->buttonVaule.NAME_FIELD.RES2 = 0;
+            if (pSystem->buttonVaule.NAME_FIELD.Button_UPcnt >= 5) {
+              pSystem->buttonVaule.NAME_FIELD.Button_UPcnt = 0;
+              pSystem->buttonVaule.NAME_FIELD.Button_UP5chk = 1;
+            }
+          }
         } else
           pSystem->buttonVaule.NAME_FIELD.RES2 = 0;
       }
@@ -1131,8 +1394,8 @@ void Remote_Task(void *argument) {
         pSystem->buttonVaule.BYTE_FIELD[1] = 0;
       }
     }
-    led_Control(pSystem, ELTop);
-    Remote_Control(pSystem, ELTop);
+    led_Control(pSystem, pELTop);
+    Remote_Control(pSystem, pELTop);
     osDelay(10);
   }
 }

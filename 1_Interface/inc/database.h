@@ -17,80 +17,6 @@
 #define _SW_VERSION_MINOR 0
 #define _SW_VERSION_SUBMINOR 2
 
-#define DATE_YEAR 24
-#define DATE_MONTH 7
-#define DATE_DAY 3
-
-typedef struct stSlotStatus {
-  uint32_t Battery_Inserted :1;    // 배터리 삽입 검출
-  uint32_t Battery_Locked :1;      // 배터리 Lock 수행
-  uint32_t Door_Closed :1;         // Door 닫힘 검출
-  uint32_t Door_Unlocked :1;       // Door Lock 수행
-  uint32_t Battery_Wakeup :1;      // 배터리 wakeup 수행
-  uint32_t Slot_Heater :1;         // 슬롯 히터 수행
-  uint32_t Discharger_Output :1;   // 충전기 입력 제어 수행
-  uint32_t Charger_Line_Output :1;  // 충전기 출력 제어 수행
-  uint32_t Door_Selected :1;       // Door 열림 표시
-  uint32_t Now_Charging :1;        // 충전 중
-  uint32_t Full_Charged :1;        // 만충 상태
-  uint32_t Balancing_Excute :1;    // 밸런싱 보정중
-  uint32_t Battery_Check_OK :1;    // 배터리 OK. 충전 가능 상태
-} SLOT_STATUS_t;
-
-// typedef struct stSlotError {
-//   uint32_t BMS_Cell_Over_Voltage :2;             // 셀 과충전 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Cell_Under_Voltage :2;            // 셀 과방전 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Cell_Imbalance :2;              // 셀 불균형 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Charge_Over_Temperature :2;         // 충전 과온 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Temperature_Imbalance :2;           // 온도 불균형 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Pack_Over_Voltage :2;             // 팩 과전압 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Pack_Under_Voltage :2;            // 팩 저전압 보호 -> BMS 값 토대로 계산
-//   uint32_t BMS_Charge_Over_Current :2;           // 충전 과전류보호 -> BMS 값 토대로 계산
-//   uint32_t SLOT_Chassis_S_Over_Temperature :2;       // Slot 과온 보호 -> SLOT 측정 값 토대로 계산
-//   uint32_t SLOT_Chassis_C_Over_Temperature :2;       // 충전기 Case 과온 보호 -> SLOT 측정 값 토대로 계산
-//   uint32_t SLOT_Pack_Over_Voltage :2;            // 과전압 보호 -> SLOT 측정 값 토대로 계산
-//   uint32_t SLOT_Pack_Under_Voltage :2;           // 저전압 보호 -> SLOT 측정 값 토대로 계산
-//   uint32_t SLOT_Charge_Over_Current :2;            // 충전 과전류보호 -> SLOT 측정 값 토대로 계산
-//   uint32_t SLOT_Charge_Current_NoFlow :1;          // 충전 전류가 흐르지 않음
-//   uint32_t Reserved :5;      // 32bit 정렬
-//   uint32_t HeartBeat_No_Update :1;             // BMS로부터 통신이 전달 되지 않는다
-//   uint32_t HeartBeat_No_Recieved :1;             // BMS로부터 통신 값이 갱신되지 않는다
-//   uint32_t Fault_Status_In_BMS :1;             // BMS의 Fault Status가 Set되어 있다
-//   uint32_t BAT_ID_Format_Difference :1;            // 배터리 ID가 올바르지 않다
-//   uint32_t BAT_ID_No_Recieved :1;              // 배터리 ID가 수신되지 않는다
-//   uint32_t BMS_Voltage_Invalid :1;             // 배터리 전압이 유효하지 않다.
-// } SLOT_ERROR_t;
-
-typedef struct stSystemRequest {
-  uint8_t BeQuiet :1;
-  uint8_t CurrentCalib :1;
-} SYSTEM_REQUEST_t;
-
-typedef struct stSlotData {
-  struct {
-    uint8_t *pSerial_Number;
-    uint8_t *pManufactory;
-    uint8_t *pBattery_ID;
-    uint8_t *pCell_Maker;
-    uint8_t *pPack_Supplier;
-    uint8_t *pModel_Number;
-    uint8_t *pSW_ReleaseDate;
-    uint8_t *pSW_Version;
-    uint8_t *pHW_Version;
-  } Incubated;  // 탑재한 배터리의 제조 정보
-  uint8_t BMS_HeartBeat;
-  int32_t ChargeCurrent;  // unit : A, resolution : 0.001
-  int32_t BatteryVoltage;  // unit : V, resolution : 0.001
-  //  int16_t SlotTemperature;         // unit : ℃, resolution : 0.1
-  //  int16_t ChargerTemperature;        // unit : ℃, resolution : 0.1
-  uint32_t WorkSequence;
-  SLOT_STATUS_t SlotStatus;
-  //  SLOT_ERROR_t ErrorStatus;
-  uint8_t TowerNumber;
-  uint8_t SlotNumber;
-  SYSTEM_REQUEST_t SystemRequest;
-} SLOT_DATA_t;
-
 typedef struct {
   int16_t aMoTemp;
   int16_t aBrTemp;
@@ -128,32 +54,32 @@ typedef struct {
   int16_t b2_LowOffSet;
   int16_t b2_HighOffSet;
 
-  uint16_t c1_LowOffSet;
-  uint16_t c1_HighOffSet;
-  uint16_t c2_LowOffSet;
-  uint16_t c2_HighOffSet;
-  uint16_t d1_LowOffSet;
-  uint16_t d1_HighOffSet;
-  uint16_t d2_LowOffSet;
-  uint16_t d2_HighOffSet;
+  int16_t c1_LowOffSet;
+  int16_t c1_HighOffSet;
+  int16_t c2_LowOffSet;
+  int16_t c2_HighOffSet;
+  int16_t d1_LowOffSet;
+  int16_t d1_HighOffSet;
+  int16_t d2_LowOffSet;
+  int16_t d2_HighOffSet;
 } _CALIBRATION_DATA;
 
 typedef struct {
   uint16_t selectedSensorA;
   int16_t aMeterCal;
-  uint16_t aStopMeterSet;
   uint16_t aStartMeterSet;
-  uint16_t aUpLimitMeterSet;
+  uint16_t aStopMeterSet;
   uint16_t aDownLimitMeterSet;
+  uint16_t aUpLimitMeterSet;
   uint16_t aPumpSwitchTimeSet;
   uint16_t aPumpDelaySet;
 
   uint16_t selectedSensorB;
   int16_t bMeterCal;
-  uint16_t bStopMeterSet;
   uint16_t bStartMeterSet;
-  uint16_t bUpLimitMeterSet;
+  uint16_t bStopMeterSet;
   uint16_t bDownLimitMeterSet;
+  uint16_t bUpLimitMeterSet;
   uint16_t bPumpSwitchTimeSet;
   uint16_t bPumpDelaySet;
 } _LEVEL_DATA;
@@ -170,14 +96,16 @@ typedef enum enumREMOTE_Data {
   USER_MENU_SET,
   RS485_SET,
   RTC_SET,
+//  HARDWARD_TEST,
 } REMOTE_SETTING_DATA_t;
 
 typedef struct {
   REMOTE_SETTING_DATA_t setData;
   uint32_t stepCnt;
   uint8_t tempStep;
-  uint8_t remoteCnt;
+  uint16_t remoteCnt;
   int16_t read_data;
+  uint8_t resetCnt;
 } _REMOTE_DATA;
 
 typedef struct {
@@ -189,36 +117,33 @@ typedef struct {
   _LEVEL_DATA levData;
 } SET_DATA_t;
 
-typedef enum enumFactory_Setting_Data {
-  MANUFACTORING_DATE,
-  SERIAL_NUMBER,
-  MODEL_NUMBER,
-  SW_RELEASE_DATE,
-  SW_VERSION,
-  HW_VERSION,
-  FACTORY_SETTING_LAST_DATA
-} FATORY_SETTING_DATA_t;
-
 typedef union {
-  uint8_t BYTE_FIELD[3];
+  uint8_t BYTE_FIELD[5];
   struct {
-    uint8_t Button_UP :1;      // 버튼 UP 키
     uint8_t Button_DOWN :1;    // 버튼 DOWN 키
-    uint8_t Button_SET :1;     // 버튼 SET 키
+    uint8_t Button_UP :1;      // 버튼 UP 키
     uint8_t Button_RESET :1;   // 버튼 RESET 키
+    uint8_t Button_SET :1;     // 버튼 SET 키
     uint8_t RES1 :4;    //
-    uint8_t Button_UP_CHK :1;      // 버튼 UP OK
-    uint8_t Button_DOWN_CHK :1;    // 버튼 DOWN OK
-    uint8_t Button_SET_CHK :1;     // 버튼 SET OK
-    uint8_t Button_RESET_CHK :1;   // 버튼 RESET OK
+    uint8_t Button_DOWN_CHK :1;   // 버튼 DOWN OK
+    uint8_t Button_UP_CHK :1;     // 버튼 UP OK
+    uint8_t Button_RESET_CHK :1;  // 버튼 RESET OK
+    uint8_t Button_SET_CHK :1;    // 버튼 SET OK
     uint8_t RES2 :4;    //
-    uint8_t Button_SET5s :1;    // SET 키 5초
+    uint8_t Button_SET5s :1;      // SET 키 5초
     uint8_t Button_UP_DN5s :1;    // 버튼 UP + DOWN 키 5초
-    uint8_t Button_SET_DN10s :1;    // 버튼 SET + DOWN 키 10초
-    uint8_t Button_SET_UP5s :1;    // 버튼 SET + UP 키 5초
-    uint8_t Button_UP5s :1;    // 버튼 UP 키 5초
-    uint8_t Button_UP10s :1;    // 버튼 UP 키 10초
-    uint8_t Button_DOWN5s :1;  // 버튼 DOWN 키 5초
+    uint8_t Button_SET_DN10s :1;  // 버튼 SET + DOWN 키 10초
+    uint8_t Button_SET_UP5s :1;   // 버튼 SET + UP 키 5초
+    uint8_t Button_UP5s :1;       // 버튼 UP 키 5초
+    uint8_t Button_UP10s :1;      // 버튼 UP 키 10초
+    uint8_t Button_DOWN5s :1;     // 버튼 DOWN 키 5초
+    uint8_t Button_RESET5s :1;    // 버튼 RESET 키 5초
+    uint8_t Button_SET_DN :1;     // 버튼 SET+DOWN
+    uint8_t RES3 :7;    //
+    uint8_t Button_DOWN5chk :1;   // 버튼 DOWN 키 5회 누름
+    uint8_t Button_UP5chk :1;     // 버튼 UP 키 5회 누름
+    uint8_t Button_DOWNcnt :3;    // 버튼 DOWN 키 카운트
+    uint8_t Button_UPcnt :3;      // 버튼 UP키 카운트
   } NAME_FIELD;
 } _BUTTON_STATUS;
 
@@ -261,7 +186,7 @@ typedef union {
 } _SETTING_STATUS;
 
 typedef union {
-  uint8_t BYTE_FIELD[3];
+  uint8_t BYTE_FIELD[1];
   struct {
     uint8_t sdCardDetect :1;  // sd카드 인식
     uint8_t waterSen1 :1;     // 수위센서 1
@@ -271,21 +196,53 @@ typedef union {
     uint8_t max31865_drdy3 :1;  // max chip drdy
     uint8_t max31865_drdy4 :1;  // max chip drdy
     uint8_t res :1;
-    float levelVolt[2];
   } NAME_FIELD;
 } _INPUT_STATUS;
+
+typedef union {
+  uint8_t BYTE_FIELD[4];
+  struct {
+    uint8_t aMoLevelFlag :1;    // A-MO Relay
+    uint8_t aMoWater1Flag :1;
+    uint8_t aMoFlag :1;
+    uint8_t aBrFlag :1;
+    uint8_t aLLFlag :1;    // A-LL Relay
+    uint8_t aHHFlag :1;    // A-HH Relay
+    uint8_t res1 :2;
+
+    uint8_t bMoLevelFlag :1;    // B-MO Relay
+    uint8_t bMoWater1Flag :1;
+    uint8_t bMoFlag :1;
+    uint8_t bBrFlag :1;
+    uint8_t bLLFlag :1;    // B-L/H Relay
+    uint8_t bHHFlag :1;    // B-LL Relay
+    uint8_t res2 :2;
+
+    uint8_t aMoRelayFlag :1;
+    uint8_t aHtRelayFlag :1;    // A-HT Relay
+    uint8_t aPtRelayFlag :1;    // A-PT Relay
+    uint8_t aLLHHRelayFlag :1;
+    uint8_t bMoRelayFlag :1;
+    uint8_t bHtRelayFlag :1;    // B-HT Relay
+    uint8_t bPtRelayFlag :1;    // B-PT Relay
+    uint8_t bLLHHRelayFlag :1;
+
+    uint8_t buzzerFlag :1;
+  } NAME_FIELD;
+} _OUTPUT_STATUS;
 
 typedef struct {
   _RTC rtc;
   uint8_t rtcStep;
   uint8_t errorCnt;
-  uint8_t rtcCnt;
+  uint16_t rtcCnt;
   float rtcTemp;
   uint8_t rtcStatus;
 } _RTC_DATA;
 
 typedef struct {
   float pt100[4];
+  float pt100Cal[4];
   uint8_t errorCnt[4];
 } _PT100_DATA;
 
@@ -294,13 +251,34 @@ typedef struct {
 } _DAC_DATA;
 
 typedef struct {
+  double levelVolt[2][10];
+  double levelVoltAvg[2];
+  double levelSensorCur[2];
+  double levelSensor[2];
+  uint16_t levelSensorCal[2];
+} _ADC_DATA;
+
+typedef struct {
+  uint8_t BYTE_FIELD[1];
+  struct {
+    uint8_t adc1None :1;  // adc 1 인식없음
+    uint8_t adc2None :1;  // adc 2 인식없음
+    uint8_t adc1Over :1;  // adc 2 과전류
+    uint8_t Res :5;  // adc 2 과전류
+  } NAME_FIELD;
+} _ERROR_DATA;
+
+typedef struct {
   _BUTTON_STATUS buttonVaule;
   _INPUT_STATUS inputValue;
+  _OUTPUT_STATUS outputValue;
   _SETTING_STATUS setValue;
   _PT100_DATA pt100Value;
   _RTC_DATA rtcValue;
   _DAC_DATA dacValue;
-} _SYSTEM_t;
+  _ADC_DATA adcValue;
+  _ERROR_DATA errorValue;
+} SYSTEM_t;
 
 uint32_t DataBase_Get_pMODBUS_Data(void);
 uint32_t DataBase_Get_pInfo_Data(void);
@@ -308,6 +286,7 @@ uint32_t DataBase_Get_Setting_Data(void);
 void TempSettingDataFlashSave(void);
 void LevelSettingDataFlashSave(void);
 void UserSettingDataFlashSave(void);
+void RS485IdDataFlashSave(uint8_t id);
 void CalSettingDataFlashSave(void);
 void DataBaseInit(void);
 

@@ -91,6 +91,7 @@ void controlTM1639(bool a);
 uint8_t buttonstatusTM1639(Tm1639_t *tm1639);
 void tm1639Display_str(Tm1639_t *tm1639, bool on, char c[]);
 void tm1639Display_num(Tm1639_t *tm1639, bool on, int num);
+void tm1639Display_float(Tm1639_t *tm1639, bool on, float num);
 void Addr_Inc_Mode(Tm1639_t *tm1639, uint8_t light_level);
 void FND_Reset(Tm1639_t *tm1639);
 void Full_Reset(Tm1639_t *tm1639);

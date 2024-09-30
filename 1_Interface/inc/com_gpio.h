@@ -53,11 +53,22 @@ bool buttonGetPressed(uint8_t ch);
 
 void buttonObjCreate(button_obj_t *p_obj, uint8_t ch, uint32_t repeat_time);
 bool buttonObjGetClicked(button_obj_t *p_obj, uint32_t pressed_time);
+bool InPutObjGetClicked(button_obj_t *p_obj, uint32_t pressed_time);
 
 void gpio_on(out_enum_t ch);
 void gpio_off(out_enum_t ch);
 void gpio_toggle(out_enum_t ch);
 uint32_t Tower_Number_Input(void);
 uint32_t Slot_Number_Input(void);
+
+void AMo_Control(ONOFF_t on);
+void BMo_Control(ONOFF_t on);
+void AHt_Control(ONOFF_t on);
+void BHt_Control(ONOFF_t on);
+void ALLHH_Control(ONOFF_t on);
+void BLLHH_Control(ONOFF_t on);
+void APt_Control(ONOFF_t on);
+void BPt_Control(ONOFF_t on);
+void BUZ_Control(ONOFF_t on);
 
 #endif /* INC_COM_GPIO_H_ */

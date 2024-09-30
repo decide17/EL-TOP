@@ -697,6 +697,44 @@ void tm1639Display_str(Tm1639_t *tm1639, bool on, char c[]) {
   Addr_Inc_Mode(tm1639, /*tm1639->data, */0x8f);
 }
 
+void tm1639Display_float(Tm1639_t *tm1639, bool on, float num) {
+  int mc = 0;
+  char c[20] = { 0 };
+
+//  if (num >= 100) {
+  sprintf(c, "%.2f", num);
+//  } else if (num >= 10) {
+//    sprintf(c, "%.2f", num);
+//  } else if (num >= 0) {
+//    sprintf(c, "%.2f", num);
+//  } else if (num >= -10) {
+//    sprintf(c, "%.2f", num);
+//  } else {
+//    sprintf(c, "%.2f", num);
+//  }
+  if (c[0] == '-' && c[1] == '0') {
+    c[1] = c[2];  // 1번 인덱스에 '.'을 넣음
+    c[2] = c[3];  // 2번 인덱스에 '4'를 넣음
+    c[3] = c[4];  // 3번 인덱스에 '5'를 넣음
+    c[4] = c[5];  // 4번 인덱스에 NULL 문자 삽입
+  }
+
+  uint8_t digitArr[SegmentNo];
+  for (int jt = 0; (jt - mc) < SegmentNo; jt++) {
+    if (c[jt + mc] == '.') {
+      digitArr[jt - 1] |= 0x80;
+      mc++;
+    }
+    if (c[jt + mc])
+      digitArr[jt] = _tm1639Convert(c[jt + mc]);
+    else
+      digitArr[jt] = 0x00;
+  };
+  processSegmentMaps(on, tm1639->data.BYTE_FIELD, digitArr);
+
+  Addr_Inc_Mode(tm1639, /*tm1639->data, */0x8f);
+}
+
 void tm1639Display_num(Tm1639_t *tm1639, bool on, int num) {
   int mc = 0;
   char c[20];
@@ -707,7 +745,7 @@ void tm1639Display_num(Tm1639_t *tm1639, bool on, int num) {
     sprintf(c, " %d", num);
   } else if (num >= 0) {
     sprintf(c, "  %d", num);
-  } else if (num >= -10) {
+  } else if (num > -10) {
     sprintf(c, " %d", num);
   } else {
     sprintf(c, "%d", num);

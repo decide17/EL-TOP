@@ -14,4 +14,7 @@
 #define _USE_INPUT
 
 void INPUT_Create_Thread(void);
+
+extern RTC_TimeTypeDef sTime;
+extern RTC_DateTypeDef sDate;
 #endif /* INC_INPUT_H_ */
