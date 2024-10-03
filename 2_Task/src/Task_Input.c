@@ -6,6 +6,8 @@
  */
 
 #include<stdlib.h>
+#include "i2c.h"
+
 #include "database.h"
 #include "com_gpio.h"
 
@@ -23,8 +25,6 @@ static void cliInput(uint8_t argc, const char **argv);
 osThreadId_t task_Input_Handle;
 const osThreadAttr_t taskInput_attributes = { .name = "Input Thread", .stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
 
-extern I2C_HandleTypeDef hi2c1;
-extern I2C_HandleTypeDef hi2c2;
 extern SPI_HandleTypeDef hspi1;
 Max31865_t max31865[4];
 __IO uint16_t ADC_data[2];
@@ -46,7 +46,7 @@ void rtc_flow(SYSTEM_t *pSystem) {
     sDate.Year = pSystem->rtcValue.rtc.Year;
     sDate.Month = pSystem->rtcValue.rtc.Month;
     sDate.Date = pSystem->rtcValue.rtc.Date;
-    sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek;
+    sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
     HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
     HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
     if (ret != true) {
@@ -73,7 +73,7 @@ void rtc_flow(SYSTEM_t *pSystem) {
         sDate.Year = pSystem->rtcValue.rtc.Year;
         sDate.Month = pSystem->rtcValue.rtc.Month;
         sDate.Date = pSystem->rtcValue.rtc.Date;
-        sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek;
+        sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
         HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
         HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
       }
@@ -122,7 +122,7 @@ void rtc_flow(SYSTEM_t *pSystem) {
           sDate.Year = pSystem->rtcValue.rtc.Year;
           sDate.Month = pSystem->rtcValue.rtc.Month;
           sDate.Date = pSystem->rtcValue.rtc.Date;
-          sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek;
+          sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
           HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
           HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
         }
@@ -275,47 +275,6 @@ void LevelAdcFlow(SYSTEM_t *pSystem) {
   }
 }
 
-void MCP4728Flow(SYSTEM_t *pSystem) {
-  SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
-  static uint8_t MCP4728Step = 0;
-  float calBuf;
-  float buff;
-
-  switch (MCP4728Step) {
-    case 0:
-      memset(&pSystem->dacValue.mcp4728, 0, sizeof(pSystem->dacValue.mcp4728));
-      MCP4728_Init(&hi2c2, pSystem->dacValue.mcp4728);
-      MCP4728Step++;
-      break;
-    case 1:
-      calBuf = (float) (4095 - (1080 - pELTop->calData.c1_HighOffSet) - 600 - pELTop->calData.c1_LowOffSet) / 2500;
-      buff = (pSystem->pt100Value.pt100Cal[0] * 10 * calBuf) + pELTop->calData.c1_LowOffSet + 600;  //) * 4.1;
-      if (buff >= 4095)
-        buff = 4095;
-      pSystem->dacValue.mcp4728.channel_Val[1] = (uint16_t) buff;
-
-      calBuf = (float) (4095 - (1080 - pELTop->calData.c2_HighOffSet) - 600 - pELTop->calData.c2_LowOffSet) / 2500;
-      buff = (pSystem->pt100Value.pt100Cal[1] * 10 * calBuf) + pELTop->calData.c2_LowOffSet + 600;  //) * 4.1;
-      if (buff >= 4095)
-        buff = 4095;
-      pSystem->dacValue.mcp4728.channel_Val[0] = (uint16_t) buff;
-
-      calBuf = (float) (4095 - (1080 - pELTop->calData.d1_HighOffSet) - 600 - pELTop->calData.d1_LowOffSet) / 2500;
-      buff = (pSystem->pt100Value.pt100Cal[2] * 10 * calBuf) + pELTop->calData.d1_LowOffSet + 600;  //) * 4.1;
-      if (buff >= 4095)
-        buff = 4095;
-      pSystem->dacValue.mcp4728.channel_Val[3] = (uint16_t) buff;
-
-      calBuf = (float) (4095 - (1080 - pELTop->calData.d2_HighOffSet) - 600 - pELTop->calData.d2_LowOffSet) / 2500;
-      buff = (pSystem->pt100Value.pt100Cal[3] * 10 * calBuf) + pELTop->calData.d2_LowOffSet + 600;  //) * 4.1;
-      if (buff >= 4095)
-        buff = 4095;
-      pSystem->dacValue.mcp4728.channel_Val[2] = (uint16_t) buff;
-      MCP4728_Write_AllChannels_Diff(&hi2c2, pSystem->dacValue.mcp4728);
-      break;
-  }
-}
-
 void Input_Task(void *argument) {
   SYSTEM_t *pSystem = (SYSTEM_t*) DataBase_Get_pInfo_Data();
   input_init();
@@ -331,7 +290,6 @@ void Input_Task(void *argument) {
     rtc_flow(pSystem);
     input_value(pSystem);
     pt100Flow(pSystem);
-    MCP4728Flow(pSystem);
     LevelAdcFlow(pSystem);
     osDelay(10);
 

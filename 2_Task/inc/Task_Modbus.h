@@ -22,7 +22,8 @@ typedef struct {
   uint16_t InputStatus;
   int16_t Pt100Value[4];
   int16_t LevelSensor[2];
-  uint16_t Reserved_1[4];
+  uint16_t RelayFlag;
+  uint16_t Reserved_1[3];
   uint16_t Year;
   uint16_t Month;
   uint16_t Week;
@@ -34,6 +35,7 @@ typedef struct {
   int16_t userData[10];
   int16_t calData[12];
   int16_t levelData[16];
+  uint16_t pt100DAC[4];
   uint16_t Reserved_2[4];
 } MODBUS_CONTROL_t;
 

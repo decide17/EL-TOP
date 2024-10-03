@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include "Task_Input.h"
 #include "Task_Cli.h"
-#include "TM1640.h"
 #include "com_flash.h"
 
 static FLASH_EraseInitTypeDef EraseInitStruct;

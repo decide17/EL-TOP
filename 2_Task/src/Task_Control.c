@@ -4,6 +4,9 @@
  *  Created on: Aug 17, 2023
  *      Author: sjpark
  */
+
+#include "i2c.h"
+
 #include "database.h"
 #include "Task_Input.h"
 #include "Task_Cli.h"
@@ -529,6 +532,47 @@ void BuzzerControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
   }
 }
 
+void MCP4728Flow(SYSTEM_t *pSystem) {
+  SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
+  static uint8_t MCP4728Step = 0;
+  float calBuf;
+  float buff;
+
+  switch (MCP4728Step) {
+    case 0:
+      memset(&pSystem->dacValue.mcp4728, 0, sizeof(pSystem->dacValue.mcp4728));
+      MCP4728_Init(&hi2c2, pSystem->dacValue.mcp4728);
+      MCP4728Step++;
+      break;
+    case 1:
+      calBuf = (float) (4095 - (1080 - pELTop->calData.c1_HighOffSet) - 600 - pELTop->calData.c1_LowOffSet) / 2500;
+      buff = (pSystem->pt100Value.pt100Cal[0] * 10 * calBuf) + pELTop->calData.c1_LowOffSet + 600;  //) * 4.1;
+      if (buff >= 4095)
+        buff = 4095;
+      pSystem->dacValue.mcp4728.channel_Val[1] = (uint16_t) buff;
+
+      calBuf = (float) (4095 - (1080 - pELTop->calData.c2_HighOffSet) - 600 - pELTop->calData.c2_LowOffSet) / 2500;
+      buff = (pSystem->pt100Value.pt100Cal[1] * 10 * calBuf) + pELTop->calData.c2_LowOffSet + 600;  //) * 4.1;
+      if (buff >= 4095)
+        buff = 4095;
+      pSystem->dacValue.mcp4728.channel_Val[0] = (uint16_t) buff;
+
+      calBuf = (float) (4095 - (1080 - pELTop->calData.d1_HighOffSet) - 600 - pELTop->calData.d1_LowOffSet) / 2500;
+      buff = (pSystem->pt100Value.pt100Cal[2] * 10 * calBuf) + pELTop->calData.d1_LowOffSet + 600;  //) * 4.1;
+      if (buff >= 4095)
+        buff = 4095;
+      pSystem->dacValue.mcp4728.channel_Val[3] = (uint16_t) buff;
+
+      calBuf = (float) (4095 - (1080 - pELTop->calData.d2_HighOffSet) - 600 - pELTop->calData.d2_LowOffSet) / 2500;
+      buff = (pSystem->pt100Value.pt100Cal[3] * 10 * calBuf) + pELTop->calData.d2_LowOffSet + 600;  //) * 4.1;
+      if (buff >= 4095)
+        buff = 4095;
+      pSystem->dacValue.mcp4728.channel_Val[2] = (uint16_t) buff;
+      MCP4728_Write_AllChannels_Diff(&hi2c2, pSystem->dacValue.mcp4728);
+      break;
+  }
+}
+
 void Control_Task(void *argument) {
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
   SYSTEM_t *pSystem = (SYSTEM_t*) DataBase_Get_pInfo_Data();
@@ -565,6 +609,8 @@ void Control_Task(void *argument) {
     BMoControl(pELTop, pSystem);
     BBrControl(pELTop, pSystem);
     MoRelayControl(pSystem);
+
+    MCP4728Flow(pSystem);
 
     if (pELTop->remoteData.remoteCnt) {
       pELTop->remoteData.remoteCnt--;

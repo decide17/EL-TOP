@@ -286,7 +286,6 @@ uint32_t DataBase_Get_Setting_Data(void);
 void TempSettingDataFlashSave(void);
 void LevelSettingDataFlashSave(void);
 void UserSettingDataFlashSave(void);
-void RS485IdDataFlashSave(uint8_t id);
 void CalSettingDataFlashSave(void);
 void DataBaseInit(void);
 

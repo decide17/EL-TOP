@@ -77,6 +77,14 @@ uint16_t MODBUS_CRC16_v3(const unsigned char *buf, unsigned int len) {
   return crc;
 }
 
+int isInRange(int value, int lower, int upper) {
+  if (value >= lower && value <= upper) {
+    return 1;  // 범위 내에 있음
+  } else {
+    return 0;  // 범위 외에 있음
+  }
+}
+
 int parse_modbus_serial(MODBUS_SERIAL_FORMAT_t *tReq, UART_DMA_RECEIVE_HANDLE_t *tDma) {
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
   uint8_t rxdata[UART_DMA_SIZE ];
@@ -179,11 +187,16 @@ uint8_t modbus_serial_send_packet(UART_DMA_SEND_HANDLE_t *tDmaTx, MODBUS_MAP_t *
   uint8_t UserSetting = 0;
   uint8_t CalSetting = 0;
   uint8_t LevelSetting = 0;
+  uint8_t RtcSetting = 0;
+  _RTC rtc;
+
   pData = NULL;
 
   switch (tReq->u8FuncCode) {
-    case 0x03: /* Read multiple registers */
-    case 0x04: /* Read input registers */
+    case 0x03:
+      /* Read multiple registers */
+    case 0x04:
+      /* Read input registers */
       if ((tReq->u16RegAddr >= tModMap->AddrInfo[CONTROL_MAP].StartAddress) && (tReq->u16RegAddr <= tModMap->AddrInfo[CONTROL_MAP].EndAddress)) {
         if (tReq->u16Quantity <= tModMap->AddrInfo[CONTROL_MAP].AddressSize) {
           pData = (uint16_t*) &tModMap->Control;
@@ -221,166 +234,291 @@ uint8_t modbus_serial_send_packet(UART_DMA_SEND_HANDLE_t *tDmaTx, MODBUS_MAP_t *
 
       *pData = (uint16_t) (((uint16_t) tReq->u8Data[i * 2] << 8) & 0xff00u) | (uint16_t) ((uint16_t) tReq->u8Data[(i * 2) + 1u] & 0x00ffu);
 
+      rtc.Year = sDate.Year;
+      rtc.Month = sDate.Month;
+      rtc.DaysOfWeek = sDate.WeekDay + 1;
+      rtc.Date = sDate.Date;
+      rtc.Hour = sTime.Hours;
+      rtc.Min = sTime.Minutes;
+      rtc.Sec = sTime.Seconds;
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 14)) {
-        sDate.Year = tModMap->Control.Year;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Year, 0, 99)) {
+          rtc.Year = tModMap->Control.Year;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 15)) {
-        sDate.Month = tModMap->Control.Month;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Month, 1, 12)) {
+          rtc.Month = tModMap->Control.Month;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 16)) {
-        sDate.WeekDay = tModMap->Control.Week;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Week, 1, 7)) {
+          rtc.DaysOfWeek = tModMap->Control.Week;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 17)) {
-        sDate.Date = tModMap->Control.Day;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Day, 1, 31)) {
+          rtc.Date = tModMap->Control.Day;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 18)) {
-        sTime.Hours = tModMap->Control.Hour;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Hour, 0, 23)) {
+          rtc.Hour = tModMap->Control.Hour;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 19)) {
-        sTime.Minutes = tModMap->Control.Minute;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Minute, 0, 59)) {
+          rtc.Min = tModMap->Control.Minute;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 20)) {
-        sTime.Seconds = tModMap->Control.Second;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Second, 0, 59)) {
+          rtc.Sec = tModMap->Control.Second;
+          RtcSetting = 1;
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 21)) {
-        pELTop->tempData.aMoTemp = tModMap->Control.tempData[0];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[0], 0, 250)) {
+          pELTop->tempData.aMoTemp = tModMap->Control.tempData[0];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 22)) {
-        pELTop->tempData.aBrTemp = tModMap->Control.tempData[1];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[1], 0, 250)) {
+          pELTop->tempData.aBrTemp = tModMap->Control.tempData[1];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 23)) {
-        pELTop->tempData.bMoTemp = tModMap->Control.tempData[2];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[2], 0, 250)) {
+          pELTop->tempData.bMoTemp = tModMap->Control.tempData[2];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 24)) {
-        pELTop->tempData.bBrTemp = tModMap->Control.tempData[3];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[3], 0, 250)) {
+          pELTop->tempData.bBrTemp = tModMap->Control.tempData[3];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 25)) {
-        pELTop->tempData.aHtOnTemp = tModMap->Control.tempData[4];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[4], 0, 50)) {
+          pELTop->tempData.aHtOnTemp = tModMap->Control.tempData[4];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 26)) {
-        pELTop->tempData.aHtOffTemp = tModMap->Control.tempData[5];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[5], 0, 50)) {
+          pELTop->tempData.aHtOffTemp = tModMap->Control.tempData[5];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 27)) {
-        pELTop->tempData.bHtOnTemp = tModMap->Control.tempData[6];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[6], 0, 50)) {
+          pELTop->tempData.bHtOnTemp = tModMap->Control.tempData[6];
+          TempSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 28)) {
-        pELTop->tempData.bHtOffTemp = tModMap->Control.tempData[7];
-        TempSettingDataFlashSave();
+        if (isInRange(tModMap->Control.tempData[7], 0, 50)) {
+          pELTop->tempData.bHtOffTemp = tModMap->Control.tempData[7];
+          TempSettingDataFlashSave();
+        }
       }
       ////////////////////////////////////////////////////////////////////////////////////
       else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 29)) {
-        pELTop->userData.channel = tModMap->Control.userData[0];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[0], 0, 2)) {
+          pELTop->userData.channel = tModMap->Control.userData[0];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 30)) {
-        pELTop->userData.rs485Id = tModMap->Control.userData[1];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[1], 1, 64)) {
+          pELTop->userData.rs485Id = tModMap->Control.userData[1];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 31)) {
-        pELTop->userData.rs485Bps = tModMap->Control.userData[2];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[2], 1, 3)) {
+          pELTop->userData.rs485Bps = tModMap->Control.userData[2];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 32)) {
-        pELTop->userData.AutoReset = tModMap->Control.userData[3];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[3], 0, 1)) {
+          pELTop->userData.AutoReset = tModMap->Control.userData[3];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 33)) {
-        pELTop->userData.TripOnDelay = tModMap->Control.userData[4];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[4], 0, 60)) {
+          pELTop->userData.TripOnDelay = tModMap->Control.userData[4];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 34)) {
-        pELTop->userData.aMoLineResAdj = tModMap->Control.userData[5];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[5], -50, 10)) {
+          pELTop->userData.aMoLineResAdj = tModMap->Control.userData[5];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 35)) {
-        pELTop->userData.aBrLineResAdj = tModMap->Control.userData[6];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[6], -50, 10)) {
+          pELTop->userData.aBrLineResAdj = tModMap->Control.userData[6];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 36)) {
-        pELTop->userData.bMoLineResAdj = tModMap->Control.userData[7];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[7], -50, 10)) {
+          pELTop->userData.bMoLineResAdj = tModMap->Control.userData[7];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 37)) {
-        pELTop->userData.bBrLineResAdj = tModMap->Control.userData[8];
-        UserSettingDataFlashSave();
+        if (isInRange(tModMap->Control.userData[8], -50, 10)) {
+          pELTop->userData.bBrLineResAdj = tModMap->Control.userData[8];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 38)) {
-        pELTop->sdData.sdFlag = tModMap->Control.userData[9];
+        if (isInRange(tModMap->Control.userData[9], 0, 1)) {
+          pELTop->sdData.sdFlag = tModMap->Control.userData[9];
+          UserSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 39)) {
-        pELTop->calData.a1_LowOffSet = tModMap->Control.calData[0];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[0], -99, 100)) {
+          pELTop->calData.a1_LowOffSet = tModMap->Control.calData[0];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 40)) {
-        pELTop->calData.a2_LowOffSet = tModMap->Control.calData[1];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[1], -99, 100)) {
+          pELTop->calData.a2_LowOffSet = tModMap->Control.calData[1];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 41)) {
-        pELTop->calData.b1_LowOffSet = tModMap->Control.calData[2];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[2], -99, 100)) {
+          pELTop->calData.b1_LowOffSet = tModMap->Control.calData[2];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 42)) {
-        pELTop->calData.b2_LowOffSet = tModMap->Control.calData[3];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[3], -99, 100)) {
+          pELTop->calData.b2_LowOffSet = tModMap->Control.calData[3];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 43)) {
-        pELTop->calData.c1_LowOffSet = tModMap->Control.calData[4];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[4], 0, 999)) {
+          pELTop->calData.c1_LowOffSet = tModMap->Control.calData[4];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 44)) {
-        pELTop->calData.c1_HighOffSet = tModMap->Control.calData[5];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[5], 0, 999)) {
+          pELTop->calData.c1_HighOffSet = tModMap->Control.calData[5];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 45)) {
-        pELTop->calData.c2_LowOffSet = tModMap->Control.calData[6];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[6], 0, 999)) {
+          pELTop->calData.c2_LowOffSet = tModMap->Control.calData[6];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 46)) {
-        pELTop->calData.c2_HighOffSet = tModMap->Control.calData[7];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[7], 0, 999)) {
+          pELTop->calData.c2_HighOffSet = tModMap->Control.calData[7];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 47)) {
-        pELTop->calData.d1_LowOffSet = tModMap->Control.calData[8];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[8], 0, 999)) {
+          pELTop->calData.d1_LowOffSet = tModMap->Control.calData[8];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 48)) {
-        pELTop->calData.d1_HighOffSet = tModMap->Control.calData[9];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[9], 0, 999)) {
+          pELTop->calData.d1_HighOffSet = tModMap->Control.calData[9];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 49)) {
-        pELTop->calData.d2_LowOffSet = tModMap->Control.calData[10];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[10], 0, 999)) {
+          pELTop->calData.d2_LowOffSet = tModMap->Control.calData[10];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 50)) {
-        pELTop->calData.d2_HighOffSet = tModMap->Control.calData[11];
-        CalSettingDataFlashSave();
+        if (isInRange(tModMap->Control.calData[11], 0, 999)) {
+          pELTop->calData.d2_HighOffSet = tModMap->Control.calData[11];
+          CalSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 51)) {
-        pELTop->levData.selectedSensorA = tModMap->Control.levelData[0];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[0], 0, 999)) {
+          pELTop->levData.selectedSensorA = tModMap->Control.levelData[0];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 52)) {
-        pELTop->levData.aMeterCal = tModMap->Control.levelData[1];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[1], -99, 100)) {
+          pELTop->levData.aMeterCal = tModMap->Control.levelData[1];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 53)) {
-        pELTop->levData.aStartMeterSet = tModMap->Control.levelData[2];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[2], 0, 999)) {
+          pELTop->levData.aStartMeterSet = tModMap->Control.levelData[2];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 54)) {
-        pELTop->levData.aStopMeterSet = tModMap->Control.levelData[3];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[3], 0, 999)) {
+          pELTop->levData.aStopMeterSet = tModMap->Control.levelData[3];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 55)) {
-        pELTop->levData.aDownLimitMeterSet = tModMap->Control.levelData[4];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[4], 0, 999)) {
+          pELTop->levData.aDownLimitMeterSet = tModMap->Control.levelData[4];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 56)) {
-        pELTop->levData.aUpLimitMeterSet = tModMap->Control.levelData[5];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[5], 0, 999)) {
+          pELTop->levData.aUpLimitMeterSet = tModMap->Control.levelData[5];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 57)) {
-        pELTop->levData.aPumpSwitchTimeSet = tModMap->Control.levelData[6];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[6], 0, 999)) {
+          pELTop->levData.aPumpSwitchTimeSet = tModMap->Control.levelData[6];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 58)) {
-        pELTop->levData.aPumpDelaySet = tModMap->Control.levelData[7];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[7], 0, 180)) {
+          pELTop->levData.aPumpDelaySet = tModMap->Control.levelData[7];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 59)) {
-        pELTop->levData.selectedSensorB = tModMap->Control.levelData[8];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[8], 0, 999)) {
+          pELTop->levData.selectedSensorB = tModMap->Control.levelData[8];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 60)) {
-        pELTop->levData.bMeterCal = tModMap->Control.levelData[9];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[9], -99, 100)) {
+          pELTop->levData.bMeterCal = tModMap->Control.levelData[9];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 61)) {
-        pELTop->levData.bStartMeterSet = tModMap->Control.levelData[10];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[10], 0, 999)) {
+          pELTop->levData.bStartMeterSet = tModMap->Control.levelData[10];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 62)) {
-        pELTop->levData.bStopMeterSet = tModMap->Control.levelData[11];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[11], 0, 999)) {
+          pELTop->levData.bStopMeterSet = tModMap->Control.levelData[11];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 63)) {
-        pELTop->levData.bDownLimitMeterSet = tModMap->Control.levelData[12];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[12], 0, 999)) {
+          pELTop->levData.bDownLimitMeterSet = tModMap->Control.levelData[12];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 64)) {
-        pELTop->levData.bUpLimitMeterSet = tModMap->Control.levelData[13];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[13], 0, 999)) {
+          pELTop->levData.bUpLimitMeterSet = tModMap->Control.levelData[13];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 65)) {
-        pELTop->levData.bPumpSwitchTimeSet = tModMap->Control.levelData[14];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[14], 0, 999)) {
+          pELTop->levData.bPumpSwitchTimeSet = tModMap->Control.levelData[14];
+          LevelSettingDataFlashSave();
+        }
       } else if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 66)) {
-        pELTop->levData.bPumpDelaySet = tModMap->Control.levelData[15];
-        LevelSettingDataFlashSave();
+        if (isInRange(tModMap->Control.levelData[15], 0, 180)) {
+          pELTop->levData.bPumpDelaySet = tModMap->Control.levelData[15];
+          LevelSettingDataFlashSave();
+        }
+      }
+
+      if (RtcSetting) {
+        pSystem->rtcValue.rtc.Year = rtc.Year;
+        pSystem->rtcValue.rtc.Month = rtc.Month;
+        pSystem->rtcValue.rtc.DaysOfWeek = rtc.DaysOfWeek;
+        pSystem->rtcValue.rtc.Date = rtc.Date;
+        pSystem->rtcValue.rtc.Hour = rtc.Hour;
+        pSystem->rtcValue.rtc.Min = rtc.Min;
+        pSystem->rtcValue.rtc.Sec = rtc.Sec;
+        pSystem->rtcValue.rtcStatus = 1;
       }
 
       tDmaTx->TxBuf[0] = tReq->u8UnitId;
@@ -403,223 +541,351 @@ uint8_t modbus_serial_send_packet(UART_DMA_SEND_HANDLE_t *tDmaTx, MODBUS_MAP_t *
         }
       }
 
+      rtc.Year = sDate.Year;
+      rtc.Month = sDate.Month;
+      rtc.DaysOfWeek = sDate.WeekDay + 1;
+      rtc.Date = sDate.Date;
+      rtc.Hour = sTime.Hours;
+      rtc.Min = sTime.Minutes;
+      rtc.Sec = sTime.Seconds;
+
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 14)) {
-        sDate.Year = tModMap->Control.Year;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Year, 0, 99)) {
+          rtc.Year = tModMap->Control.Year;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 15)) {
-        sDate.Month = tModMap->Control.Month;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Month, 1, 12)) {
+          rtc.Month = tModMap->Control.Month;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 16)) {
-        sDate.WeekDay = tModMap->Control.Week;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Week, 1, 7)) {
+          rtc.DaysOfWeek = tModMap->Control.Week;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 17)) {
-        sDate.Date = tModMap->Control.Day;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Day, 1, 31)) {
+          rtc.Date = tModMap->Control.Day;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 18)) {
-        sTime.Hours = tModMap->Control.Hour;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Hour, 0, 23)) {
+          rtc.Hour = tModMap->Control.Hour;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 19)) {
-        sTime.Minutes = tModMap->Control.Minute;
-        pSystem->rtcValue.rtcStatus = 1;
+        if (isInRange(tModMap->Control.Minute, 0, 59)) {
+          rtc.Min = tModMap->Control.Minute;
+          RtcSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 20)) {
-        sTime.Seconds = tModMap->Control.Second;
+        if (isInRange(tModMap->Control.Second, 0, 59)) {
+          rtc.Sec = tModMap->Control.Second;
+          RtcSetting = 1;
+        }
+      }
+      if (RtcSetting) {
+        pSystem->rtcValue.rtc.Year = rtc.Year;
+        pSystem->rtcValue.rtc.Month = rtc.Month;
+        pSystem->rtcValue.rtc.DaysOfWeek = rtc.DaysOfWeek;
+        pSystem->rtcValue.rtc.Date = rtc.Date;
+        pSystem->rtcValue.rtc.Hour = rtc.Hour;
+        pSystem->rtcValue.rtc.Min = rtc.Min;
+        pSystem->rtcValue.rtc.Sec = rtc.Sec;
         pSystem->rtcValue.rtcStatus = 1;
       }
+
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 21)) {
-        pELTop->tempData.aMoTemp = tModMap->Control.tempData[0];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[0], 0, 250)) {
+          pELTop->tempData.aMoTemp = tModMap->Control.tempData[0];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 22)) {
-        pELTop->tempData.aBrTemp = tModMap->Control.tempData[1];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[1], 0, 250)) {
+          pELTop->tempData.aBrTemp = tModMap->Control.tempData[1];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 23)) {
-        pELTop->tempData.bMoTemp = tModMap->Control.tempData[2];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[2], 0, 250)) {
+          pELTop->tempData.bMoTemp = tModMap->Control.tempData[2];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 24)) {
-        pELTop->tempData.bBrTemp = tModMap->Control.tempData[3];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[3], 0, 250)) {
+          pELTop->tempData.bBrTemp = tModMap->Control.tempData[3];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 25)) {
-        pELTop->tempData.aHtOnTemp = tModMap->Control.tempData[4];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[4], 0, 50)) {
+          pELTop->tempData.aHtOnTemp = tModMap->Control.tempData[4];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 26)) {
-        pELTop->tempData.aHtOffTemp = tModMap->Control.tempData[5];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[5], 0, 50)) {
+          pELTop->tempData.aHtOffTemp = tModMap->Control.tempData[5];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 27)) {
-        pELTop->tempData.bHtOnTemp = tModMap->Control.tempData[6];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[6], 0, 50)) {
+          pELTop->tempData.bHtOnTemp = tModMap->Control.tempData[6];
+          TempSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 28)) {
-        pELTop->tempData.bHtOffTemp = tModMap->Control.tempData[7];
-        TempSetting = 1;
+        if (isInRange(tModMap->Control.tempData[7], 0, 50)) {
+          pELTop->tempData.bHtOffTemp = tModMap->Control.tempData[7];
+          TempSetting = 1;
+        }
       }
       if (TempSetting == 1)
         TempSettingDataFlashSave();
       ////////////////////////////////////////////////////////////////////////////////////
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 29)) {
-        pELTop->userData.channel = tModMap->Control.userData[0];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[0], 0, 2)) {
+          pELTop->userData.channel = tModMap->Control.userData[0];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 30)) {
-        pELTop->userData.rs485Id = tModMap->Control.userData[1];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[1], 1, 64)) {
+          pELTop->userData.rs485Id = tModMap->Control.userData[1];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 31)) {
-        pELTop->userData.rs485Bps = tModMap->Control.userData[2];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[2], 1, 3)) {
+          pELTop->userData.rs485Bps = tModMap->Control.userData[2];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 32)) {
-        pELTop->userData.AutoReset = tModMap->Control.userData[3];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[3], 0, 1)) {
+          pELTop->userData.AutoReset = tModMap->Control.userData[3];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 33)) {
-        pELTop->userData.TripOnDelay = tModMap->Control.userData[4];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[4], 0, 60)) {
+          pELTop->userData.TripOnDelay = tModMap->Control.userData[4];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 34)) {
-        pELTop->userData.aMoLineResAdj = tModMap->Control.userData[5];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[5], -50, 10)) {
+          pELTop->userData.aMoLineResAdj = tModMap->Control.userData[5];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 35)) {
-        pELTop->userData.aBrLineResAdj = tModMap->Control.userData[6];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[6], -50, 10)) {
+          pELTop->userData.aBrLineResAdj = tModMap->Control.userData[6];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 36)) {
-        pELTop->userData.bMoLineResAdj = tModMap->Control.userData[7];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[7], -50, 10)) {
+          pELTop->userData.bMoLineResAdj = tModMap->Control.userData[7];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 37)) {
-        pELTop->userData.bBrLineResAdj = tModMap->Control.userData[8];
-        UserSetting = 1;
+        if (isInRange(tModMap->Control.userData[8], -50, 10)) {
+          pELTop->userData.bBrLineResAdj = tModMap->Control.userData[8];
+          UserSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 38)) {
-        pELTop->sdData.sdFlag = tModMap->Control.userData[9];
+        if (isInRange(tModMap->Control.userData[9], 0, 1)) {
+          pELTop->sdData.sdFlag = tModMap->Control.userData[9];
+          UserSetting = 1;
+        }
       }
       if (UserSetting == 1)
         UserSettingDataFlashSave();
+      ///////////////////////////////////////////////////////////////////////
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 39)) {
-        pELTop->calData.a1_LowOffSet = tModMap->Control.calData[0];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[0], -99, 100)) {
+          pELTop->calData.a1_LowOffSet = tModMap->Control.calData[0];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 40)) {
-        pELTop->calData.a2_LowOffSet = tModMap->Control.calData[1];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[1], -99, 100)) {
+          pELTop->calData.a2_LowOffSet = tModMap->Control.calData[1];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 41)) {
-        pELTop->calData.b1_LowOffSet = tModMap->Control.calData[2];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[2], -99, 100)) {
+          pELTop->calData.b1_LowOffSet = tModMap->Control.calData[2];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 42)) {
-        pELTop->calData.b2_LowOffSet = tModMap->Control.calData[3];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[3], 0, 999)) {
+          pELTop->calData.b2_LowOffSet = tModMap->Control.calData[3];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 43)) {
-        pELTop->calData.c1_LowOffSet = tModMap->Control.calData[4];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[4], 0, 999)) {
+          pELTop->calData.c1_LowOffSet = tModMap->Control.calData[4];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 44)) {
-        pELTop->calData.c1_HighOffSet = tModMap->Control.calData[5];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[5], 0, 999)) {
+          pELTop->calData.c1_HighOffSet = tModMap->Control.calData[5];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 45)) {
-        pELTop->calData.c2_LowOffSet = tModMap->Control.calData[6];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[6], 0, 999)) {
+          pELTop->calData.c2_LowOffSet = tModMap->Control.calData[6];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 46)) {
-        pELTop->calData.c2_HighOffSet = tModMap->Control.calData[7];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[7], 0, 999)) {
+          pELTop->calData.c2_HighOffSet = tModMap->Control.calData[7];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 47)) {
-        pELTop->calData.d1_LowOffSet = tModMap->Control.calData[8];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[8], 0, 999)) {
+          pELTop->calData.d1_LowOffSet = tModMap->Control.calData[8];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 48)) {
-        pELTop->calData.d1_HighOffSet = tModMap->Control.calData[9];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[9], 0, 999)) {
+          pELTop->calData.d1_HighOffSet = tModMap->Control.calData[9];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 49)) {
-        pELTop->calData.d2_LowOffSet = tModMap->Control.calData[10];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[10], 0, 999)) {
+          pELTop->calData.d2_LowOffSet = tModMap->Control.calData[10];
+          CalSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 50)) {
-        pELTop->calData.d2_HighOffSet = tModMap->Control.calData[11];
-        CalSetting = 1;
+        if (isInRange(tModMap->Control.calData[11], 0, 999)) {
+          pELTop->calData.d2_HighOffSet = tModMap->Control.calData[11];
+          CalSetting = 1;
+        }
       }
       if (CalSetting == 1)
         CalSettingDataFlashSave();
+      ////////////////////////////////////////////////////////////////////////////
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 51)) {
-        pELTop->levData.selectedSensorA = tModMap->Control.levelData[0];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[0], 0, 999)) {
+          pELTop->levData.selectedSensorA = tModMap->Control.levelData[0];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 52)) {
-        pELTop->levData.aMeterCal = tModMap->Control.levelData[1];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[1], -99, 100)) {
+          pELTop->levData.aMeterCal = tModMap->Control.levelData[1];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 53)) {
-        pELTop->levData.aStartMeterSet = tModMap->Control.levelData[2];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[2], 0, 999)) {
+          pELTop->levData.aStartMeterSet = tModMap->Control.levelData[2];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 54)) {
-        pELTop->levData.aStopMeterSet = tModMap->Control.levelData[3];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[3], 0, 999)) {
+          pELTop->levData.aStopMeterSet = tModMap->Control.levelData[3];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 55)) {
-        pELTop->levData.aDownLimitMeterSet = tModMap->Control.levelData[4];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[4], 0, 999)) {
+          pELTop->levData.aDownLimitMeterSet = tModMap->Control.levelData[4];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 56)) {
-        pELTop->levData.aUpLimitMeterSet = tModMap->Control.levelData[5];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[5], 0, 999)) {
+          pELTop->levData.aUpLimitMeterSet = tModMap->Control.levelData[5];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 57)) {
-        pELTop->levData.aPumpSwitchTimeSet = tModMap->Control.levelData[6];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[6], 0, 999)) {
+          pELTop->levData.aPumpSwitchTimeSet = tModMap->Control.levelData[6];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 58)) {
-        pELTop->levData.aPumpDelaySet = tModMap->Control.levelData[7];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[7], 0, 180)) {
+          pELTop->levData.aPumpDelaySet = tModMap->Control.levelData[7];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 59)) {
-        pELTop->levData.selectedSensorB = tModMap->Control.levelData[8];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[8], 0, 999)) {
+          pELTop->levData.selectedSensorB = tModMap->Control.levelData[8];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 60)) {
-        pELTop->levData.bMeterCal = tModMap->Control.levelData[9];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[9], -99, 100)) {
+          pELTop->levData.bMeterCal = tModMap->Control.levelData[9];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 61)) {
-        pELTop->levData.bStartMeterSet = tModMap->Control.levelData[10];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[10], 0, 999)) {
+          pELTop->levData.bStartMeterSet = tModMap->Control.levelData[10];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 62)) {
-        pELTop->levData.bStopMeterSet = tModMap->Control.levelData[11];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[11], 0, 999)) {
+          pELTop->levData.bStopMeterSet = tModMap->Control.levelData[11];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 63)) {
-        pELTop->levData.bDownLimitMeterSet = tModMap->Control.levelData[12];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[12], 0, 999)) {
+          pELTop->levData.bDownLimitMeterSet = tModMap->Control.levelData[12];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 64)) {
-        pELTop->levData.bUpLimitMeterSet = tModMap->Control.levelData[13];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[13], 0, 999)) {
+          pELTop->levData.bUpLimitMeterSet = tModMap->Control.levelData[13];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 65)) {
-        pELTop->levData.bPumpSwitchTimeSet = tModMap->Control.levelData[14];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[14], 0, 999)) {
+          pELTop->levData.bPumpSwitchTimeSet = tModMap->Control.levelData[14];
+          LevelSetting = 1;
+        }
       }
       if (tReq->u16RegAddr == (tModMap->AddrInfo[CONTROL_MAP].StartAddress + 66)) {
-        pELTop->levData.bPumpDelaySet = tModMap->Control.levelData[15];
-        LevelSetting = 1;
+        if (isInRange(tModMap->Control.levelData[15], 0, 180)) {
+          pELTop->levData.bPumpDelaySet = tModMap->Control.levelData[15];
+          LevelSetting = 1;
+        }
       }
       if (LevelSetting == 1)
         LevelSettingDataFlashSave();
@@ -697,8 +963,8 @@ void Update_Modbus_Map_Control() {
   SYSTEM_t *pSystem = (SYSTEM_t*) DataBase_Get_pInfo_Data();
 
   pMODBUS->Control.FWVersionMajor = 0;
-  pMODBUS->Control.FWVersionMinor = 0;
-  pMODBUS->Control.FWVersionPatch = 6;
+  pMODBUS->Control.FWVersionMinor = 1;
+  pMODBUS->Control.FWVersionPatch = 0;
 
   pMODBUS->Control.InputStatus = pSystem->inputValue.NAME_FIELD.waterSen1;
   pMODBUS->Control.InputStatus |= (pSystem->inputValue.NAME_FIELD.waterSen2 << 1);
@@ -709,9 +975,11 @@ void Update_Modbus_Map_Control() {
   pMODBUS->Control.LevelSensor[0] = (int16_t) pSystem->adcValue.levelSensorCal[0];
   pMODBUS->Control.LevelSensor[1] = (int16_t) pSystem->adcValue.levelSensorCal[1];
 
+  pMODBUS->Control.RelayFlag = (uint16_t) pSystem->outputValue.BYTE_FIELD[2];
+
   pMODBUS->Control.Year = sDate.Year;
   pMODBUS->Control.Month = sDate.Month;
-  pMODBUS->Control.Week = sDate.WeekDay;
+  pMODBUS->Control.Week = sDate.WeekDay + 1;
   pMODBUS->Control.Day = sDate.Date;
   pMODBUS->Control.Hour = sTime.Hours;
   pMODBUS->Control.Minute = sTime.Minutes;
@@ -767,6 +1035,10 @@ void Update_Modbus_Map_Control() {
   pMODBUS->Control.levelData[14] = pELTop->levData.bPumpSwitchTimeSet;
   pMODBUS->Control.levelData[15] = pELTop->levData.bPumpDelaySet;
 
+  pMODBUS->Control.pt100DAC[0] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[0]) + 400;
+  pMODBUS->Control.pt100DAC[1] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[1]) + 400;
+  pMODBUS->Control.pt100DAC[2] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[2]) + 400;
+  pMODBUS->Control.pt100DAC[3] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[3]) + 400;
 }
 
 void Update_Modbus_Map(void) {

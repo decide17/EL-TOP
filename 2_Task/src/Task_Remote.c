@@ -12,6 +12,7 @@
 #include "tm1639.h"
 #include "User_Temp_Set.h"
 #include "User_Level_Set.h"
+#include "User_Menu_Set.h"
 #include "Factory_Calibration.h"
 
 #define IO4_AB_MO_FND 0
@@ -56,7 +57,6 @@ void RESET_BUTTON(SYSTEM_t *SystemData) {
   SystemData->buttonVaule.BYTE_FIELD[2] = 0;
   SystemData->buttonVaule.BYTE_FIELD[3] = 0;
   SystemData->buttonVaule.BYTE_FIELD[4] = 0;
-//  SystemData->setValue.BYTE_FIELD
   memset(&SystemData->setValue, 0, sizeof(SystemData->setValue));
 }
 
@@ -310,7 +310,6 @@ void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
               tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
               pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
             } else {
-//              if (pSystem->pt100Value.pt100Cal[2] >= pELTop->tempData.bMoTemp) {
               if (pSystem->outputValue.NAME_FIELD.bMoFlag) {
                 tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
                 pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
@@ -328,7 +327,6 @@ void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
               tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
               pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
             } else {
-//              if (pSystem->pt100Value.pt100Cal[3] >= pELTop->tempData.bBrTemp) {
               if (pSystem->outputValue.NAME_FIELD.bBrFlag) {
                 tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
                 pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
@@ -498,18 +496,7 @@ void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Yer");
     tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN5s) {
-    pELTop->remoteData.remoteCnt = 200;
-    pELTop->remoteData.setData = USER_MENU_SET;
-    Full_Reset(&tm1639_io3);
-    Full_Reset(&tm1639_io4);
-    BUZZER_Control(ON, 100);
-    pELTop->remoteData.tempStep = 1;
-    pELTop->remoteData.read_data = pELTop->userData.AutoReset;
-    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "rSt");
-    if (pELTop->remoteData.read_data)
-      tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
-    else
-      tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
+    UserMenuStartFunc(pSystem, pELTop);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP5s) {
     pELTop->remoteData.remoteCnt = 200;
     pELTop->remoteData.setData = RS485_SET;
@@ -523,26 +510,6 @@ void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
     NVIC_SystemReset();
   }
-
-//  else if (pSystem->buttonVaule.NAME_FIELD.Button_RESET5s) {
-//    pELTop->remoteData.setData = HARDWARD_TEST;
-//    Full_Reset(&tm1639_io3);
-//    Full_Reset(&tm1639_io4);
-//    BUZZER_Control(ON, 100);
-//    pELTop->remoteData.tempStep = 1;
-//    pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[0];
-//    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA1");
-//    char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//    char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//    uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//    if (written < 0 || written >= sizeof(read_str1)) {
-//      memset(read_str1, 0, sizeof(read_str1));
-//    }
-//    snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//    tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//  }
-
 }
 
 void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
@@ -589,131 +556,7 @@ void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
       firstSetup(pSystem, pELTop);
       break;
     case USER_MENU_SET:
-      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-        pELTop->remoteData.remoteCnt = 0;
-        pELTop->remoteData.resetCnt = 0;
-        BUZZER_Control(ON, 100);
-        pELTop->remoteData.setData = STAND_BY;
-        RESET_BUTTON(pSystem);
-        Full_Reset(&tm1639_io3);
-        Full_Reset(&tm1639_io4);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-        pELTop->remoteData.remoteCnt = 200;
-        switch (pELTop->remoteData.tempStep) {
-          case 1:
-            pELTop->remoteData.read_data = circularValue(1, 0, ++pELTop->remoteData.read_data);
-            break;
-          case 2:
-            pELTop->remoteData.read_data = circularValue(60, 0, ++pELTop->remoteData.read_data);
-            break;
-          case 3:
-          case 4:
-          case 5:
-          case 6:
-            pELTop->remoteData.read_data = circularValue(10, -50, ++pELTop->remoteData.read_data);
-            break;
-        }
-        if (pELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
-        else {
-          if (pELTop->remoteData.read_data)
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
-          else
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
-        }
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-        pELTop->remoteData.remoteCnt = 200;
-        switch (pELTop->remoteData.tempStep) {
-          case 2:
-            pELTop->remoteData.read_data = circularValue(60, 0, --pELTop->remoteData.read_data);
-            break;
-          case 3:
-          case 4:
-          case 5:
-          case 6:
-            pELTop->remoteData.read_data = circularValue(10, -50, --pELTop->remoteData.read_data);
-            break;
-        }
-        if (pELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
-        RESET_BUTTON(pSystem);
-      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-        pELTop->remoteData.remoteCnt = 200;
-        switch (pELTop->remoteData.tempStep) {
-          case 1:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "trd");
-            pELTop->userData.AutoReset = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.TripOnDelay;
-            break;
-          case 2:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AJ1");
-            pELTop->userData.TripOnDelay = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.aMoLineResAdj;
-            break;
-          case 3:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AJ2");
-            pELTop->userData.aMoLineResAdj = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.aBrLineResAdj;
-            break;
-          case 4:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bJ1");
-            pELTop->userData.aBrLineResAdj = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.bMoLineResAdj;
-            break;
-          case 5:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bJ2");
-            pELTop->userData.bMoLineResAdj = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.bBrLineResAdj;
-            break;
-          case 6:
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "rST");
-            pELTop->userData.bBrLineResAdj = pELTop->remoteData.read_data;
-            pELTop->remoteData.read_data = pELTop->userData.AutoReset;
-            if (pELTop->remoteData.read_data)
-              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, " On");
-            else
-              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "OFF");
-            break;
-        }
-        UserSettingDataFlashSave();
-        pELTop->remoteData.tempStep++;
-        if (pELTop->remoteData.tempStep > 6)
-          pELTop->remoteData.tempStep = 1;
-        RESET_BUTTON(pSystem);
-        BUZZER_Control(ON, 100);
-        if (pELTop->remoteData.tempStep != 1)
-          tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->remoteData.read_data);
-      } else if (pELTop->remoteData.resetCnt == 1) {
-        switch (pELTop->remoteData.tempStep) {
-          case 1:
-            pELTop->userData.AutoReset = pELTop->remoteData.read_data;
-            break;
-          case 2:
-            pELTop->userData.TripOnDelay = pELTop->remoteData.read_data;
-            break;
-          case 3:
-            pELTop->userData.aMoLineResAdj = pELTop->remoteData.read_data;
-            break;
-          case 4:
-            pELTop->userData.aBrLineResAdj = pELTop->remoteData.read_data;
-            break;
-          case 5:
-            pELTop->userData.bMoLineResAdj = pELTop->remoteData.read_data;
-            break;
-          case 6:
-            pELTop->userData.bBrLineResAdj = pELTop->remoteData.read_data;
-            break;
-        }
-        UserSettingDataFlashSave();
-        pELTop->remoteData.resetCnt = 0;
-        cliPrintf("STAND_BY Set\n");
-        BUZZER_Control(ON, 100);
-        pELTop->remoteData.setData = STAND_BY;
-        RESET_BUTTON(pSystem);
-        Full_Reset(&tm1639_io3);
-        Full_Reset(&tm1639_io4);
-      }
+      UserMenuSetFunc(pSystem, pELTop);
       break;
     case RS485_SET:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
@@ -753,8 +596,9 @@ void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
         switch (pELTop->remoteData.tempStep) {
           case 1:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "bPS");
+            pELTop->userData.rs485Id = pELTop->remoteData.read_data;
             pELTop->remoteData.read_data = pELTop->userData.rs485Bps;
-            RS485IdDataFlashSave(pELTop->remoteData.read_data);
+            UserSettingDataFlashSave();
             break;
           case 2:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "ID-");
@@ -772,7 +616,8 @@ void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
       } else if (pELTop->remoteData.resetCnt == 1) {
         switch (pELTop->remoteData.tempStep) {
           case 1:
-            RS485IdDataFlashSave(pELTop->remoteData.read_data);
+            pELTop->userData.rs485Id = pELTop->remoteData.read_data;
+            UserSettingDataFlashSave();
             break;
           case 2:
             pELTop->userData.rs485Bps = pELTop->remoteData.read_data;
@@ -788,153 +633,6 @@ void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
         Full_Reset(&tm1639_io4);
       }
       break;
-//    case HARDWARD_TEST:
-//      if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
-//        pELTop->remoteData.remoteCnt = 0;
-//        BUZZER_Control(ON, 100);
-//        pELTop->remoteData.setData = STAND_BY;
-//        RESET_BUTTON(pSystem);
-//        Full_Reset(&tm1639_io3);
-//        Full_Reset(&tm1639_io4);
-//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_UP_CHK) {
-//        pELTop->remoteData.remoteCnt = 0;
-//        switch (pELTop->remoteData.tempStep) {
-//          case 1:
-//          case 2:
-//          case 3:
-//          case 4:
-//            pELTop->remoteData.read_data = circularValue(4095, 0, ++pELTop->remoteData.read_data);
-//            char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//            char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//            uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//          case 7:
-//            pELTop->remoteData.read_data = circularValue(59, 0, ++pELTop->remoteData.read_data);
-//            break;
-//        }
-//
-//        RESET_BUTTON(pSystem);
-//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
-//        pELTop->remoteData.remoteCnt = 0;
-//        switch (pELTop->remoteData.tempStep) {
-//          case 1:
-//          case 2:
-//          case 3:
-//          case 4:
-//            pELTop->remoteData.read_data = circularValue(4095, 0, (pELTop->remoteData.read_data + 100));
-//            char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//            char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//            uint8_t written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//          case 7:
-//            pELTop->remoteData.read_data = circularValue(59, 0, --pELTop->remoteData.read_data);
-//            break;
-//        }
-//
-//        RESET_BUTTON(pSystem);
-//      } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
-//        char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//        char read_str2[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//        uint8_t written;
-//        pELTop->remoteData.remoteCnt = 0;
-//        switch (pELTop->remoteData.tempStep) {
-//          case 1:
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA2");
-//            pSystem->dacValue.mcp4728.channel_Val[0] = pELTop->remoteData.read_data;
-//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[1];
-//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//          case 2:
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA3");
-//            pSystem->dacValue.mcp4728.channel_Val[1] = pELTop->remoteData.read_data;
-//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[2];
-//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//          case 3:
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA4");
-//            pSystem->dacValue.mcp4728.channel_Val[2] = pELTop->remoteData.read_data;
-//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[3];
-//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//          case 4:
-//            Full_Reset(&tm1639_io3);
-//            Full_Reset(&tm1639_io4);
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AD1");
-//            pSystem->dacValue.mcp4728.channel_Val[3] = pELTop->remoteData.read_data;
-//            sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
-//            pELTop->remoteData.stepCnt = HAL_GetTick();
-//            break;
-//          case 5:
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "AD2");
-//            sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
-//            pELTop->remoteData.stepCnt = HAL_GetTick();
-//            break;
-//          case 6:
-//            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "DA1");
-//            pELTop->remoteData.read_data = pSystem->dacValue.mcp4728.channel_Val[0];
-//            written = snprintf(read_str1, sizeof(read_str1), " %02d", (pELTop->remoteData.read_data / 100));
-//            if (written < 0 || written >= sizeof(read_str1)) {
-//              memset(read_str1, 0, sizeof(read_str1));
-//            }
-//            snprintf(read_str2, sizeof(read_str2), " %02d", (pELTop->remoteData.read_data % 100));
-//            tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str1);
-//            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str2);
-//            break;
-//        }
-//        pELTop->remoteData.tempStep++;
-//        if (pELTop->remoteData.tempStep > 6)
-//          pELTop->remoteData.tempStep = 1;
-//        RESET_BUTTON(pSystem);
-//        BUZZER_Control(ON, 100);
-//      } else {
-//        if (pELTop->remoteData.tempStep == 5 || pELTop->remoteData.tempStep == 6) {
-//          char read_str1[5];  // 4자리 숫자와 마지막 null 문자를 위한 공간
-//          pELTop->remoteData.remoteCnt = 0;
-//          if (HAL_GetTick() - pELTop->remoteData.stepCnt >= 500) {
-//            if (pELTop->remoteData.tempStep == 5) {
-//              sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[0]);
-//              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
-//            } else if (pELTop->remoteData.tempStep == 6) {
-//              sprintf(read_str1, "%1.2f", pSystem->adcValue.levelVolt[1]);
-//              tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str1);
-//            }
-//            pELTop->remoteData.stepCnt = HAL_GetTick();
-//          }
-//        }
-//      }
-//      break;
     case A_B_L_H_SETCHK:
       if (pSystem->buttonVaule.NAME_FIELD.Button_RESET_CHK) {
         pELTop->remoteData.remoteCnt = 0;
@@ -1241,6 +939,12 @@ bool buttonClickedInput(SYSTEM_t *pSystem) {
   return ret;
 }
 
+/**
+ * @brief TM1639 버튼 입력
+ * @details 최초 버튼 클릭 및 연속버튼 입력을 받음
+ * @param args SYSTEM_t 구조체
+ * @return 인식없음 0 버튼이 클릭되면 1, 연속버튼이클릭되면 2
+ */
 uint8_t buttonGetInput(SYSTEM_t *pSystem) {
   uint8_t ret = false;
 
@@ -1304,6 +1008,51 @@ uint8_t buttonGetInput(SYSTEM_t *pSystem) {
   return ret;
 }
 
+void ContinuousButtonPress(SYSTEM_t *pSystem) {
+  switch (pSystem->buttonVaule.BYTE_FIELD[0]) {
+    case 0x08:
+      pSystem->buttonVaule.NAME_FIELD.Button_SET5s = 1;
+      break;
+    case 0x03:
+      pSystem->buttonVaule.NAME_FIELD.Button_UP_DN5s = 1;
+      break;
+    case 0x09:
+      pSystem->buttonVaule.NAME_FIELD.Button_SET_DN10s = 1;
+      break;
+    case 0x0A:
+      pSystem->buttonVaule.NAME_FIELD.Button_SET_UP5s = 1;
+      break;
+    case 0x01:
+      pSystem->buttonVaule.NAME_FIELD.Button_DOWN5s = 1;
+      break;
+    case 0x02:
+      pSystem->buttonVaule.NAME_FIELD.Button_UP5s = 1;
+      break;
+    case 0x04:
+      pSystem->buttonVaule.NAME_FIELD.Button_RESET5s = 1;
+      break;
+  }
+}
+
+void initTm1639(void) {
+  tm1639_io3.clk_gpio = GPIOB;
+  tm1639_io3.clk_pin = GPIO_PIN_8;
+  tm1639_io3.dio_gpio = GPIOB;
+  tm1639_io3.dio_pin = GPIO_PIN_9;
+  tm1639_io3.stb_gpio = GPIOC;
+  tm1639_io3.stb_pin = GPIO_PIN_14;
+  initTM1639(&tm1639_io3);
+
+  tm1639_io4.clk_gpio = GPIOA;
+  tm1639_io4.clk_pin = GPIO_PIN_11;
+  tm1639_io4.dio_gpio = GPIOA;
+  tm1639_io4.dio_pin = GPIO_PIN_12;
+  tm1639_io4.stb_gpio = GPIOC;
+  tm1639_io4.stb_pin = GPIO_PIN_15;
+  initTM1639(&tm1639_io4);
+
+}
+
 void Remote_Task(void *argument) {
   SYSTEM_t *pSystem = (SYSTEM_t*) DataBase_Get_pInfo_Data();
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
@@ -1315,25 +1064,7 @@ void Remote_Task(void *argument) {
   cliAdd("remote", cliRemote);
 #endif
 
-  tm1639_io3.clk_gpio = GPIOB;
-  tm1639_io3.clk_pin = GPIO_PIN_8;
-  tm1639_io3.dio_gpio = GPIOB;
-  tm1639_io3.dio_pin = GPIO_PIN_9;
-  tm1639_io3.stb_gpio = GPIOC;
-  tm1639_io3.stb_pin = GPIO_PIN_14;
-//  tm1639_io3.stb_gpio = GPIOC;
-//  tm1639_io3.stb_pin = GPIO_PIN_3;
-  initTM1639(&tm1639_io3);
-
-  tm1639_io4.clk_gpio = GPIOA;
-  tm1639_io4.clk_pin = GPIO_PIN_11;
-  tm1639_io4.dio_gpio = GPIOA;
-  tm1639_io4.dio_pin = GPIO_PIN_12;
-  tm1639_io4.stb_gpio = GPIOC;
-  tm1639_io4.stb_pin = GPIO_PIN_15;
-//  tm1639_io4.stb_gpio = GPIOC;
-//  tm1639_io4.stb_pin = GPIO_PIN_5;
-  initTM1639(&tm1639_io4);
+  initTm1639();
 
   while (1) {
     if (pELTop->remoteData.setData == STAND_BY || pELTop->remoteData.setData == INIT_VIEW || pSystem->buttonVaule.NAME_FIELD.RES2) {
@@ -1341,29 +1072,7 @@ void Remote_Task(void *argument) {
       if (res == 1) {
         pSystem->buttonVaule.NAME_FIELD.RES2 = (tm1639_io3.button & 0x03) | ((tm1639_io4.button & 0x03) << 2);
       } else if (res == 2) {
-        switch (pSystem->buttonVaule.BYTE_FIELD[0]) {
-          case 0x08:
-            pSystem->buttonVaule.NAME_FIELD.Button_SET5s = 1;
-            break;
-          case 0x03:
-            pSystem->buttonVaule.NAME_FIELD.Button_UP_DN5s = 1;
-            break;
-          case 0x09:
-            pSystem->buttonVaule.NAME_FIELD.Button_SET_DN10s = 1;
-            break;
-          case 0x0A:
-            pSystem->buttonVaule.NAME_FIELD.Button_SET_UP5s = 1;
-            break;
-          case 0x01:
-            pSystem->buttonVaule.NAME_FIELD.Button_DOWN5s = 1;
-            break;
-          case 0x02:
-            pSystem->buttonVaule.NAME_FIELD.Button_UP5s = 1;
-            break;
-          case 0x04:
-            pSystem->buttonVaule.NAME_FIELD.Button_RESET5s = 1;
-            break;
-        }
+        ContinuousButtonPress(pSystem);
       } else {
         if (pELTop->remoteData.setData == STAND_BY || pELTop->remoteData.setData == INIT_VIEW) {
           pSystem->buttonVaule.BYTE_FIELD[1] = pSystem->buttonVaule.NAME_FIELD.RES2;

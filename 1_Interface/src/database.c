@@ -110,20 +110,6 @@ static void DataBaseTempInit(void) {
   }
 }
 
-void RS485IdDataFlashSave(uint8_t id) {
-  FlashErase(FLASH_USER_START_ADDR);
-  FlashSave(FLASH_USER_START_ADDR, ELTopData.userData.channel);
-  FlashSave(FLASH_USER_START_ADDR + 4, id);
-  FlashSave(FLASH_USER_START_ADDR + 8, ELTopData.userData.rs485Bps);
-  FlashSave(FLASH_USER_START_ADDR + 12, ELTopData.userData.AutoReset);
-  FlashSave(FLASH_USER_START_ADDR + 16, ELTopData.userData.TripOnDelay);
-  FlashSave(FLASH_USER_START_ADDR + 20, ELTopData.userData.aMoLineResAdj);
-  FlashSave(FLASH_USER_START_ADDR + 24, ELTopData.userData.aBrLineResAdj);
-  FlashSave(FLASH_USER_START_ADDR + 28, ELTopData.userData.bMoLineResAdj);
-  FlashSave(FLASH_USER_START_ADDR + 32, ELTopData.userData.bBrLineResAdj);
-  FlashSave(FLASH_USER_START_ADDR + 36, ELTopData.sdData.sdFlag);
-}
-
 void UserSettingDataFlashSave() {
   FlashErase(FLASH_USER_START_ADDR);
   FlashSave(FLASH_USER_START_ADDR, ELTopData.userData.channel);
