@@ -8,6 +8,7 @@
 #include "database.h"
 
 #include "Task_Cli.h"
+#include "Task_Remote.h"
 
 #include "com_gpio.h"
 #include "tm1639.h"
@@ -17,11 +18,6 @@ extern void RESET_BUTTON(SYSTEM_t *SystemData);
 extern int circularValue(int max, int min, int value);
 extern Tm1639_t tm1639_io3;
 extern Tm1639_t tm1639_io4;
-
-#define IO4_AB_MO_FND 0
-#define IO4_B_LEVEL_FND 1
-#define IO3_AB_BR_FND 0
-#define IO3_A_LEVEL_FND 1
 
 void UserMenuStartFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   pELTop->remoteData.remoteCnt = 200;

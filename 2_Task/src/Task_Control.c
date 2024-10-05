@@ -23,6 +23,133 @@ const osThreadAttr_t taskControl_attributes = { .name = "Control Thread", .stack
 extern Tm1639_t tm1639_io3;
 extern Tm1639_t tm1639_io4;
 
+#include "rtc.h"
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
+
+void rtc_flow(SYSTEM_t *pSystem) {
+  static uint8_t rtcStep = 0;
+  _RTC rtc;
+  bool ret;
+
+  if (pSystem->rtcValue.rtcStatus == 1) {
+    ret = DS3231_SetTime(&pSystem->rtcValue.rtc);
+    sTime.Hours = pSystem->rtcValue.rtc.Hour;
+    sTime.Minutes = pSystem->rtcValue.rtc.Min;
+    sTime.Seconds = pSystem->rtcValue.rtc.Sec;
+    sDate.Year = pSystem->rtcValue.rtc.Year;
+    sDate.Month = pSystem->rtcValue.rtc.Month;
+    sDate.Date = pSystem->rtcValue.rtc.Date;
+    sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
+    HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+    HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+    if (ret != true) {
+      pSystem->rtcValue.errorCnt++;
+      if (pSystem->rtcValue.errorCnt >= 10)
+        pSystem->rtcValue.rtcStatus = 0xff;
+    } else {
+      pSystem->rtcValue.errorCnt = 0;
+      pSystem->rtcValue.rtcStatus = 0;
+    }
+    return;
+  } else if (pSystem->rtcValue.rtcStatus == 2) {
+    ret = DS3231_GetTime(&rtc);
+    if (ret != true) {
+      pSystem->rtcValue.errorCnt++;
+      if (pSystem->rtcValue.errorCnt >= 10)
+        rtcStep = 99;
+    } else {
+      if (rtc.Year >= 24) {
+        pSystem->rtcValue.rtc = rtc;
+        sTime.Hours = pSystem->rtcValue.rtc.Hour;
+        sTime.Minutes = pSystem->rtcValue.rtc.Min;
+        sTime.Seconds = pSystem->rtcValue.rtc.Sec;
+        sDate.Year = pSystem->rtcValue.rtc.Year;
+        sDate.Month = pSystem->rtcValue.rtc.Month;
+        sDate.Date = pSystem->rtcValue.rtc.Date;
+        sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
+        HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+        HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+      }
+      pSystem->rtcValue.errorCnt = 0;
+      pSystem->rtcValue.rtcCnt = 0;
+    }
+    if (ret != true) {
+      pSystem->rtcValue.errorCnt++;
+      if (pSystem->rtcValue.errorCnt >= 10)
+        pSystem->rtcValue.rtcStatus = 0xff;
+    } else {
+      pSystem->rtcValue.errorCnt = 0;
+      pSystem->rtcValue.rtcStatus = 0;
+    }
+  }
+  switch (rtcStep) {
+    case 0:
+      DS3231_Init(&hi2c1);
+      pSystem->rtcValue.errorCnt = 0;
+      rtcStep++;
+      break;
+    case 1:
+      DS3231_ClearAlarm1();
+      ret = DS3231_SetAlarm1(ALARM_MODE_SEC_MATCHED, 0, 0, 0, 30);
+      if (ret != true) {
+        pSystem->rtcValue.errorCnt++;
+        if (pSystem->rtcValue.errorCnt >= 10)
+          rtcStep = 99;
+      } else {
+        rtcStep++;
+        pSystem->rtcValue.errorCnt = 0;
+      }
+      break;
+    case 2:
+      ret = DS3231_GetTime(&rtc);
+      if (ret != true) {
+        pSystem->rtcValue.errorCnt++;
+        if (pSystem->rtcValue.errorCnt >= 10)
+          rtcStep = 99;
+      } else {
+        if (rtc.Year >= 24) {
+          pSystem->rtcValue.rtc = rtc;
+          sTime.Hours = pSystem->rtcValue.rtc.Hour;
+          sTime.Minutes = pSystem->rtcValue.rtc.Min;
+          sTime.Seconds = pSystem->rtcValue.rtc.Sec;
+          sDate.Year = pSystem->rtcValue.rtc.Year;
+          sDate.Month = pSystem->rtcValue.rtc.Month;
+          sDate.Date = pSystem->rtcValue.rtc.Date;
+          sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
+          HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+          HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+        }
+        rtcStep++;
+        pSystem->rtcValue.errorCnt = 0;
+        pSystem->rtcValue.rtcCnt = 0;
+      }
+      break;
+    case 3:
+      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+      pSystem->rtcValue.rtcCnt++;
+      if (pSystem->rtcValue.rtcCnt >= 10 * 60 * 60 * 12)
+        rtcStep = 2;
+      break;
+    case 99:
+      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+      pSystem->rtcValue.rtcStatus = 0xff;
+      // todo error sequence make
+      break;
+  }
+}
+
+void initTime(void) {
+  sTime.Hours = 0;
+  sTime.Minutes = 0;
+  sTime.Seconds = 0;
+  sDate.Year = 24;
+  sDate.Month = 1;
+  sDate.Date = 1;
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+}
+
 void APtControl(SET_DATA_t *pELTop) {
   static uint8_t AptOnFlag = 0;
   static uint32_t ptTimeSave = 0;
@@ -582,6 +709,7 @@ void Control_Task(void *argument) {
 
   while (pELTop->remoteData.setData == INIT_VIEW)
     osDelay(100);
+  initTime();
 
   while (1) {
     RelayLEDControl(pELTop, pSystem);
@@ -619,6 +747,7 @@ void Control_Task(void *argument) {
       }
     }
 
+    rtc_flow(pSystem);
     BuzzerControl(pELTop, pSystem);
     osDelay(100);
   }

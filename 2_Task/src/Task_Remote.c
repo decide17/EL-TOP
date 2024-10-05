@@ -4,21 +4,20 @@
  *  Created on: Aug 24, 2024
  *      Author: USER
  */
-#include "stdbool.h"
+#include <stdbool.h>
+
 #include "database.h"
+
 #include "Task_Input.h"
 #include "Task_Cli.h"
+#include "Task_Remote.h"
+
 #include "com_flash.h"
 #include "tm1639.h"
 #include "User_Temp_Set.h"
 #include "User_Level_Set.h"
 #include "User_Menu_Set.h"
 #include "Factory_Calibration.h"
-
-#define IO4_AB_MO_FND 0
-#define IO4_B_LEVEL_FND 1
-#define IO3_AB_BR_FND 0
-#define IO3_A_LEVEL_FND 1
 
 #ifdef _USE_CLI
 static void cliRemote(uint8_t argc, const char **argv);
@@ -70,6 +69,180 @@ int circularValue(int max, int min, int value) {
   }
 }
 
+void StandByLedDisplay(SYSTEM_t *pSystem, uint8_t displayCase) {
+  if (displayCase) {
+    if (pSystem->pt100Value.pt100Cal[2] < -99) {
+      tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+      pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
+    } else if (pSystem->pt100Value.pt100Cal[2] > 280) {
+      tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+      tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
+      pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
+    } else {
+      if (pSystem->outputValue.NAME_FIELD.bMoFlag) {
+        tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+        pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
+      } else {
+        pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
+        tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+        tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
+      }
+    }
+    if (pSystem->pt100Value.pt100Cal[3] < -99) {
+      tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+      pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
+    } else if (pSystem->pt100Value.pt100Cal[3] > 280) {
+      tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
+      tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
+      pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
+    } else {
+      if (pSystem->outputValue.NAME_FIELD.bBrFlag) {
+        tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+        pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
+      } else {
+        pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
+        tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
+        tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
+      }
+    }
+    tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+    tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+  } else {
+    if (pSystem->pt100Value.pt100Cal[0] < -99) {
+      tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+      pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
+    } else if (pSystem->pt100Value.pt100Cal[0] > 280) {
+      tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
+      tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
+      pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
+    } else {
+      if (pSystem->outputValue.NAME_FIELD.aMoFlag) {
+        tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
+        pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
+      } else {
+        pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
+        tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
+        tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
+      }
+    }
+    if (pSystem->pt100Value.pt100Cal[1] < -99) {
+      tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+      pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
+    } else if (pSystem->pt100Value.pt100Cal[1] > 280) {
+      tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+      tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
+      pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
+    } else {
+      if (pSystem->outputValue.NAME_FIELD.aBrFlag) {
+        tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
+        pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
+      } else {
+        pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
+        tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+        tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
+      }
+    }
+    tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
+    tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
+  }
+}
+
+void StandByTempDisplay(SYSTEM_t *pSystem, uint8_t displayCase) {
+  char read_str[10];
+
+  if (pSystem->pt100Value.pt100Cal[displayCase * 2] < -99) {
+    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Sht");
+  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] < 280) {
+    if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 10) {
+      snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+    } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 100) {
+      snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+    } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2] <= -1) {
+      snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+    } else {
+      snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
+    }
+    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, read_str);
+  } else {
+    tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "---");
+  }
+  if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < -99) {
+    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "Sht");
+  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 280) {
+    if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 10) {
+      snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+    } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 100) {
+      snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+    } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] <= -1) {
+      snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+    } else {
+      snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
+    }
+    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str);
+  } else {
+    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
+  }
+}
+
+void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
+  char read_str[10] = { 0 };
+
+  if (pELTop->userData.channel == 0) {
+    if (pSystem->adcValue.levelSensorCur[0] >= 4) {
+      if (pSystem->adcValue.levelSensorCur[0] >= pELTop->levData.selectedSensorA) {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorA / 100));
+        tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+      } else {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
+        tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+      }
+      ////////////////////////////////////////
+      /////////////////////////////// 디버깅용
+      ///////////////////////////////////////
+      snprintf(read_str, sizeof(read_str), "%.2f", (double) pSystem->adcValue.levelVoltAvg[0]);
+      tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      //////////////////////////////////////////
+    } else {
+      tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
+    }
+  } else if (pELTop->userData.channel == 1) {
+    if (pSystem->adcValue.levelSensorCur[1] >= 4) {
+      if (pSystem->adcValue.levelSensorCur[1] >= pELTop->levData.selectedSensorB) {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorB / 100));
+        tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      } else {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
+        tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      }
+    } else {
+      tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
+    }
+  } else {
+    if (pSystem->adcValue.levelSensorCur[0] >= 4) {
+      if (pSystem->adcValue.levelSensorCur[0] >= pELTop->levData.selectedSensorA) {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorA / 100));
+        tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+      } else {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
+        tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
+      }
+    } else {
+      tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
+    }
+    if (pSystem->adcValue.levelSensorCur[1] >= 4) {
+      if (pSystem->adcValue.levelSensorCur[1] >= pELTop->levData.selectedSensorB) {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorB / 100));
+        tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      } else {
+        snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
+        tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      }
+    } else {
+      tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
+    }
+  }
+}
+
 void channel_display(SET_DATA_t *pELTop) {
   switch (pELTop->remoteData.read_data) {
     case 0:
@@ -88,8 +261,15 @@ void channel_display(SET_DATA_t *pELTop) {
       break;
   }
 }
+
 uint8_t displayCase = 0;
 uint8_t displayCnt = 0;
+/**
+ * @brief 대기상태에서 전면 화면 제어
+ * @details 버튼으로 설정화면에 들어가지않은 상태, LED, FND 표시
+ * @param args SYSTEM_t 구조체 SET_DATA_t 구조체
+ * @return none
+ */
 void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   static uint8_t ledStep = 0;
   static uint32_t pre_time;
@@ -289,7 +469,6 @@ void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
             }
           }
           pre_time = HAL_GetTick();
-          char read_str[10];
           if (pELTop->userData.channel == 0) {
             displayCase = 0;
           } else if (pELTop->userData.channel == 1) {
@@ -301,149 +480,21 @@ void led_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
               displayCase ^= 1;
             }
           }
-          if (displayCase) {
-            if (pSystem->pt100Value.pt100Cal[2] < -99) {
-              tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
-              pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
-            } else if (pSystem->pt100Value.pt100Cal[2] > 280) {
-              tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
-              tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
-              pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
-            } else {
-              if (pSystem->outputValue.NAME_FIELD.bMoFlag) {
-                tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
-                pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
-              } else {
-                pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
-                tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
-                tm1639_io4.data.NAME_FIELD.LED2_GREEN = 1;
-              }
-            }
-            if (pSystem->pt100Value.pt100Cal[3] < -99) {
-              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
-              pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
-            } else if (pSystem->pt100Value.pt100Cal[3] > 280) {
-              tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
-              tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
-              pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
-            } else {
-              if (pSystem->outputValue.NAME_FIELD.bBrFlag) {
-                tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
-                pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
-              } else {
-                pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
-                tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
-                tm1639_io3.data.NAME_FIELD.LED7_GREEN = 1;
-              }
-            }
-            tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
-            tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
-          } else {
-            if (pSystem->pt100Value.pt100Cal[0] < -99) {
-              tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
-              pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
-            } else if (pSystem->pt100Value.pt100Cal[0] > 280) {
-              tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
-              tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
-              pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
-            } else {
-//              if (pSystem->pt100Value.pt100Cal[0] >= pELTop->tempData.aMoTemp) {
-              if (pSystem->outputValue.NAME_FIELD.aMoFlag) {
-                tm1639_io4.data.NAME_FIELD.LED1_GREEN = 0;
-                pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 1;
-              } else {
-                pSystem->setValue.NAME_FIELD.AMO_RED_TOGGLE = 0;
-                tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
-                tm1639_io4.data.NAME_FIELD.LED1_GREEN = 1;
-              }
-            }
-            if (pSystem->pt100Value.pt100Cal[1] < -99) {
-              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
-              pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
-            } else if (pSystem->pt100Value.pt100Cal[1] > 280) {
-              tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
-              tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
-              pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
-            } else {
-//              if (pSystem->pt100Value.pt100Cal[1] >= pELTop->tempData.aBrTemp) {
-              if (pSystem->outputValue.NAME_FIELD.aBrFlag) {
-                tm1639_io3.data.NAME_FIELD.LED8_GREEN = 0;
-                pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
-              } else {
-                pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
-                tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
-                tm1639_io3.data.NAME_FIELD.LED8_GREEN = 1;
-              }
-            }
-            tm1639_io4.data.NAME_FIELD.LED2_GREEN = 0;
-            tm1639_io3.data.NAME_FIELD.LED7_GREEN = 0;
-          }
-          if (pSystem->pt100Value.pt100Cal[displayCase * 2] < -99) {
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Sht");
-          } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] < 280) {
-            if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 10) {
-              snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
-            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 100) {
-              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
-            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2] <= -1) {
-              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
-            } else {
-              snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
-            }
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, read_str);
-          } else {
-            tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "---");
-          }
-          if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < -99) {
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "Sht");
-          } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 280) {
-            if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 10) {
-              snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
-            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 100) {
-              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
-            } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] > -10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] <= -1) {
-              snprintf(read_str, sizeof(read_str), " %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
-            } else {
-              snprintf(read_str, sizeof(read_str), "%d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
-            }
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, read_str);
-          } else {
-            tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
-          }
-          if (pELTop->userData.channel == 0) {
-            if (pSystem->adcValue.levelSensorCur[0] >= 4) {
-              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
-              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
-            } else {
-              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
-            }
-          } else if (pELTop->userData.channel == 1) {
-            if (pSystem->adcValue.levelSensorCur[1] >= 4) {
-              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
-              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
-            } else {
-              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
-            }
-          } else {
-            if (pSystem->adcValue.levelSensorCur[0] >= 4) {
-              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[0] / 100));
-              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
-            } else {
-              tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
-            }
-            if (pSystem->adcValue.levelSensorCur[1] >= 4) {
-              snprintf(read_str, sizeof(read_str), "%.2f", ((double) pSystem->adcValue.levelSensorCal[1] / 100));
-              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
-            } else {
-              tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, "---");
-            }
-          }
+          StandByLedDisplay(pSystem, displayCase);
+          StandByTempDisplay(pSystem, displayCase);
+          StandByLevelDisplay(pSystem, pELTop);
         }
         break;
     }
   }
 }
 
+/**
+ * @brief 첫 버튼 이 눌릴때의 제어
+ * @details INIT_VIEW 나 STAND_BY 에서 버튼이 눌렸을때 각 메뉴로 들어가게 된다.
+ * @param args SYSTEM_t 구조체 SET_DATA_t 구조체
+ * @return none
+ */
 void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   if (pSystem->buttonVaule.NAME_FIELD.Button_SET5s) {
     pELTop->remoteData.remoteCnt = 200;
@@ -512,6 +563,12 @@ void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
   }
 }
 
+/**
+ * @brief 버튼 이 눌릴때의 제어
+ * @details 버튼이 눌리면 다양한 메뉴로 들어가게 된다
+ * @param args SYSTEM_t 구조체 SET_DATA_t 구조체
+ * @return none
+ */
 void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
 
   switch (pELTop->remoteData.setData) {
@@ -1008,6 +1065,12 @@ uint8_t buttonGetInput(SYSTEM_t *pSystem) {
   return ret;
 }
 
+/**
+ * @brief TM1639 연속버튼 입력
+ * @details 연속 버튼 입력시간이 지난후 버튼 등록
+ * @param args SYSTEM_t 구조체
+ * @return none
+ */
 void ContinuousButtonPress(SYSTEM_t *pSystem) {
   switch (pSystem->buttonVaule.BYTE_FIELD[0]) {
     case 0x08:
@@ -1034,6 +1097,12 @@ void ContinuousButtonPress(SYSTEM_t *pSystem) {
   }
 }
 
+/**
+ * @brief TM1639 초기화
+ * @details TM1639 GPIO 초기화 및 Init
+ * @param args none
+ * @return none
+ */
 void initTm1639(void) {
   tm1639_io3.clk_gpio = GPIOB;
   tm1639_io3.clk_pin = GPIO_PIN_8;

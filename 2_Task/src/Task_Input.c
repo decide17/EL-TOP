@@ -29,135 +29,9 @@ extern SPI_HandleTypeDef hspi1;
 Max31865_t max31865[4];
 __IO uint16_t ADC_data[2];
 
-#include "rtc.h"
-RTC_TimeTypeDef sTime;
-RTC_DateTypeDef sDate;
-
-void rtc_flow(SYSTEM_t *pSystem) {
-  static uint8_t rtcStep = 0;
-  _RTC rtc;
-  bool ret;
-
-  if (pSystem->rtcValue.rtcStatus == 1) {
-    ret = DS3231_SetTime(&pSystem->rtcValue.rtc);
-    sTime.Hours = pSystem->rtcValue.rtc.Hour;
-    sTime.Minutes = pSystem->rtcValue.rtc.Min;
-    sTime.Seconds = pSystem->rtcValue.rtc.Sec;
-    sDate.Year = pSystem->rtcValue.rtc.Year;
-    sDate.Month = pSystem->rtcValue.rtc.Month;
-    sDate.Date = pSystem->rtcValue.rtc.Date;
-    sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
-    HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-    HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-    if (ret != true) {
-      pSystem->rtcValue.errorCnt++;
-      if (pSystem->rtcValue.errorCnt >= 10)
-        pSystem->rtcValue.rtcStatus = 0xff;
-    } else {
-      pSystem->rtcValue.errorCnt = 0;
-      pSystem->rtcValue.rtcStatus = 0;
-    }
-    return;
-  } else if (pSystem->rtcValue.rtcStatus == 2) {
-    ret = DS3231_GetTime(&rtc);
-    if (ret != true) {
-      pSystem->rtcValue.errorCnt++;
-      if (pSystem->rtcValue.errorCnt >= 10)
-        rtcStep = 99;
-    } else {
-      if (rtc.Year >= 24) {
-        pSystem->rtcValue.rtc = rtc;
-        sTime.Hours = pSystem->rtcValue.rtc.Hour;
-        sTime.Minutes = pSystem->rtcValue.rtc.Min;
-        sTime.Seconds = pSystem->rtcValue.rtc.Sec;
-        sDate.Year = pSystem->rtcValue.rtc.Year;
-        sDate.Month = pSystem->rtcValue.rtc.Month;
-        sDate.Date = pSystem->rtcValue.rtc.Date;
-        sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
-        HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-        HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-      }
-      pSystem->rtcValue.errorCnt = 0;
-      pSystem->rtcValue.rtcCnt = 0;
-    }
-    if (ret != true) {
-      pSystem->rtcValue.errorCnt++;
-      if (pSystem->rtcValue.errorCnt >= 10)
-        pSystem->rtcValue.rtcStatus = 0xff;
-    } else {
-      pSystem->rtcValue.errorCnt = 0;
-      pSystem->rtcValue.rtcStatus = 0;
-    }
-  }
-  switch (rtcStep) {
-    case 0:
-      DS3231_Init(&hi2c1);
-      pSystem->rtcValue.errorCnt = 0;
-      rtcStep++;
-      break;
-    case 1:
-      DS3231_ClearAlarm1();
-      ret = DS3231_SetAlarm1(ALARM_MODE_SEC_MATCHED, 0, 0, 0, 30);
-      if (ret != true) {
-        pSystem->rtcValue.errorCnt++;
-        if (pSystem->rtcValue.errorCnt >= 10)
-          rtcStep = 99;
-      } else {
-        rtcStep++;
-        pSystem->rtcValue.errorCnt = 0;
-      }
-      break;
-    case 2:
-      ret = DS3231_GetTime(&rtc);
-      if (ret != true) {
-        pSystem->rtcValue.errorCnt++;
-        if (pSystem->rtcValue.errorCnt >= 10)
-          rtcStep = 99;
-      } else {
-        if (rtc.Year >= 24) {
-          pSystem->rtcValue.rtc = rtc;
-          sTime.Hours = pSystem->rtcValue.rtc.Hour;
-          sTime.Minutes = pSystem->rtcValue.rtc.Min;
-          sTime.Seconds = pSystem->rtcValue.rtc.Sec;
-          sDate.Year = pSystem->rtcValue.rtc.Year;
-          sDate.Month = pSystem->rtcValue.rtc.Month;
-          sDate.Date = pSystem->rtcValue.rtc.Date;
-          sDate.WeekDay = pSystem->rtcValue.rtc.DaysOfWeek - 1;
-          HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-          HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-        }
-        rtcStep++;
-        pSystem->rtcValue.errorCnt = 0;
-        pSystem->rtcValue.rtcCnt = 0;
-      }
-      break;
-    case 3:
-      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-      pSystem->rtcValue.rtcCnt++;
-      if (pSystem->rtcValue.rtcCnt >= 100 * 60 * 60 * 6)
-        rtcStep = 2;
-      break;
-    case 99:
-      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-      pSystem->rtcValue.rtcStatus = 0xff;
-      // todo error sequence make
-      break;
-  }
-}
-
-void initTime(void) {
-  sTime.Hours = 1;
-  sTime.Minutes = 0;
-  sTime.Seconds = 0;
-  sDate.Year = 24;
-  sDate.Month = 1;
-  sDate.Date = 1;
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-}
-
 void pt100Flow(SYSTEM_t *pSystem) {
   static uint8_t pt100Step = 0;
+  static uint8_t pt100Cnt = 0;
   bool ret = false;
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
 
@@ -188,6 +62,14 @@ void pt100Flow(SYSTEM_t *pSystem) {
       pSystem->pt100Value.pt100Cal[1] = pSystem->pt100Value.pt100[1] + pELTop->userData.aBrLineResAdj + ((float) pELTop->calData.a2_LowOffSet / 10);
       pSystem->pt100Value.pt100Cal[2] = pSystem->pt100Value.pt100[2] + pELTop->userData.bMoLineResAdj + ((float) pELTop->calData.b1_LowOffSet / 10);
       pSystem->pt100Value.pt100Cal[3] = pSystem->pt100Value.pt100[3] + pELTop->userData.bBrLineResAdj + ((float) pELTop->calData.b2_LowOffSet / 10);
+      pt100Step++;
+      break;
+    case 2:
+      pt100Cnt++;
+      if (pt100Cnt >= 100) {
+        pt100Cnt = 0;
+        pt100Step = 1;
+      }
       break;
   }
 }
@@ -221,48 +103,50 @@ void input_value(SYSTEM_t *pSystem) {
   pSystem->inputValue.NAME_FIELD.waterSen2 = InPutObjGetClicked(&water2, 3000);
 }
 
+// 비교 함수
 int compare(const void *a, const void *b) {
-  if (*(int*) a > *(int*) b)
-    return 1;
-  else if (*(int*) a < *(int*) b)
+  uint16_t val1 = *(const uint16_t*) a;
+  uint16_t val2 = *(const uint16_t*) b;
+
+  if (val1 < val2)
     return -1;
-  else
-    return 0;
+  if (val1 > val2)
+    return 1;
+  return 0;
 }
 
 void LevelAdcFlow(SYSTEM_t *pSystem) {
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
   static uint8_t LevelAdcStep = 0;
-//  static uint8_t AdcCnt = 0;
+  static uint8_t AdcCnt = 0;
 
   switch (LevelAdcStep) {
     case 0:
       memset(pSystem->adcValue.levelVolt, 0, sizeof(pSystem->adcValue.levelVolt));
-//      AdcCnt = 0;
+      AdcCnt = 0;
       LevelAdcStep++;
       break;
     case 1:
-      for (uint8_t i = 0; i < 10; i++) {
-        pSystem->adcValue.levelVolt[0][i] = (double) ADC_data[0] / 4096 * 3.3;
-        pSystem->adcValue.levelVolt[1][i] = (double) ADC_data[1] / 4096 * 3.3;
+      pSystem->adcValue.levelVolt[0][AdcCnt] = ADC_data[0];
+      pSystem->adcValue.levelVolt[1][AdcCnt] = ADC_data[1];
+      AdcCnt++;
+      if (AdcCnt >= 50) {
+        LevelAdcStep++;
       }
-//      AdcCnt++;
-//      if (AdcCnt >= 10)
-      LevelAdcStep++;
       break;
     case 2:
-      qsort(pSystem->adcValue.levelVolt[0], 10, sizeof(pSystem->adcValue.levelVolt[0][0]), compare);
-      qsort(pSystem->adcValue.levelVolt[1], 10, sizeof(pSystem->adcValue.levelVolt[1][0]), compare);
-      pSystem->adcValue.levelVoltAvg[0] = (pSystem->adcValue.levelVolt[0][4] + pSystem->adcValue.levelVolt[0][5] + pSystem->adcValue.levelVolt[0][6]
-          + pSystem->adcValue.levelVolt[0][7]) / 4;
-      pSystem->adcValue.levelVoltAvg[1] = (pSystem->adcValue.levelVolt[1][4] + pSystem->adcValue.levelVolt[1][5] + pSystem->adcValue.levelVolt[1][6]
-          + pSystem->adcValue.levelVolt[1][7]) / 4;
+      qsort(pSystem->adcValue.levelVolt[0], 50, sizeof(uint16_t), compare);
+      qsort(pSystem->adcValue.levelVolt[1], 50, sizeof(uint16_t), compare);
+      pSystem->adcValue.levelVoltAvg[0] = (double) (pSystem->adcValue.levelVolt[0][24] + pSystem->adcValue.levelVolt[0][25] + pSystem->adcValue.levelVolt[0][26]
+          + pSystem->adcValue.levelVolt[0][27]) / 4 / 4096 * 3.3;
+      pSystem->adcValue.levelVoltAvg[1] = (double) (pSystem->adcValue.levelVolt[1][24] + pSystem->adcValue.levelVolt[1][25] + pSystem->adcValue.levelVolt[1][26]
+          + pSystem->adcValue.levelVolt[1][27]) / 4 / 4096 * 3.3;
       LevelAdcStep++;
       break;
     case 3:
       for (uint8_t i = 0; i < 2; i++) {
-//        pSystem->adcValue.levelSensorCur[i] = 12.085 * pSystem->adcValue.levelVoltAvg[i] - 1.3776;
-        pSystem->adcValue.levelSensorCur[i] = 8.9553 * pSystem->adcValue.levelVoltAvg[i] - 0.0127;
+        pSystem->adcValue.levelSensorCur[i] = (0.4744 * pSystem->adcValue.levelVoltAvg[i] * pSystem->adcValue.levelVoltAvg[i])
+            + (8.1836 * pSystem->adcValue.levelVoltAvg[i]) + 0.3617;
       }
 
       pSystem->adcValue.levelSensor[0] = (0.0625 * pSystem->adcValue.levelSensorCur[0] - 0.25) * ((double) pELTop->levData.selectedSensorA / 100);
@@ -281,17 +165,14 @@ void Input_Task(void *argument) {
   HAL_ADCEx_Calibration_Start(&hadc1);
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*) &ADC_data[0], 2);
 
-  initTime();
-
 #ifdef _USE_CLI
   cliAdd("input", cliInput);
 #endif
   while (1) {
-    rtc_flow(pSystem);
     input_value(pSystem);
     pt100Flow(pSystem);
     LevelAdcFlow(pSystem);
-    osDelay(10);
+    osDelay(1);
 
   }
 }

@@ -8,6 +8,7 @@
 #include "database.h"
 
 #include "Task_Cli.h"
+#include "Task_Remote.h"
 
 #include "com_gpio.h"
 #include "tm1639.h"
@@ -17,11 +18,6 @@ extern void RESET_BUTTON(SYSTEM_t *SystemData);
 extern int circularValue(int max, int min, int value);
 extern Tm1639_t tm1639_io3;
 extern Tm1639_t tm1639_io4;
-
-#define IO4_AB_MO_FND 0
-#define IO4_B_LEVEL_FND 1
-#define IO3_AB_BR_FND 0
-#define IO3_A_LEVEL_FND 1
 
 static uint8_t sensor_view = 0;
 
@@ -134,7 +130,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
           break;
       }
       cliPrintf("Button_UP_CHK read_data : %d tempStep : %d\n", pELTop->remoteData.read_data, pELTop->remoteData.tempStep);
-//      if (pELTop->remoteData.tempStep != 1 && pELTop->remoteData.tempStep != 3 && pELTop->remoteData.tempStep != 5 && pELTop->remoteData.tempStep != 7)
       RESET_BUTTON(pSystem);
     }
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN_CHK) {
@@ -189,7 +184,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
           break;
       }
       cliPrintf("Button_UP_CHK read_data : %d tempStep : %d\n", pELTop->remoteData.read_data, pELTop->remoteData.tempStep);
-//      if (pELTop->remoteData.tempStep != 1 && pELTop->remoteData.tempStep != 3 && pELTop->remoteData.tempStep != 5 && pELTop->remoteData.tempStep != 7)
       RESET_BUTTON(pSystem);
     }
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_SET_CHK) {
@@ -314,9 +308,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     } else {
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
     }
-//    char str[5];
-//    snprintf(str, sizeof(str), "%f", pSystem->pt100Value.pt100[0]);
-//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, str);
   } else if (pELTop->remoteData.tempStep == 2 && sensor_view == 1) {
     char read_str[10];
     if (pSystem->pt100Value.pt100[1] < 280) {
@@ -333,9 +324,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     } else {
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
     }
-//    char str[5];
-//    snprintf(str, sizeof(str), "%f", pSystem->pt100Value.pt100[1]);
-//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, str);
   } else if (pELTop->remoteData.tempStep == 3 && sensor_view == 1) {
     char read_str[10];
     if (pSystem->pt100Value.pt100[2] < 280) {
@@ -352,9 +340,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     } else {
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
     }
-//    char str[5];
-//    snprintf(str, sizeof(str), "%f", pSystem->pt100Value.pt100[2]);
-//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, str);
   } else if (pELTop->remoteData.tempStep == 4 && sensor_view == 1) {
     char read_str[10];
     if (pSystem->pt100Value.pt100[3] < 280) {
@@ -371,9 +356,6 @@ void FactoryCalibrationSetFunc(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     } else {
       tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "---");
     }
-//    char str[5];
-//    snprintf(str, sizeof(str), "%f", pSystem->pt100Value.pt100[3]);
-//    tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, str);
   }
 
 }

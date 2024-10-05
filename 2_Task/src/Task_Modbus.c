@@ -11,7 +11,7 @@
 #include "com_gpio.h"
 #include "database.h"
 
-#include "Task_Input.h"
+#include "Task_Control.h"
 
 osThreadId_t task_Modbus_Handle;
 const osThreadAttr_t taskModbus_attributes = { .name = "MODBUS Task", .stack_size = 256 * 4, .priority = (osPriority_t) osPriorityNormal, };
@@ -944,6 +944,12 @@ void Modbus_Process(void) {
   }
 }
 
+/**
+ * @brief 모드버스 init
+ * @details 설정 어드레스 및 사이즈 체크
+ * @param args void
+ * @return 없음
+ */
 void Modbus_Init() {
   MODBUS_MAP_t *pMODBUS = (MODBUS_MAP_t*) DataBase_Get_pMODBUS_Data();
 
@@ -957,6 +963,12 @@ void Modbus_Init() {
 
 }
 
+/**
+ * @brief 모드버스 데이터 업데이트
+ * @details 주기적으로 돌면서 기존 저장되어있는 값들을 모드버스로 복사하여 업데이트
+ * @param args void
+ * @return 없음
+ */
 void Update_Modbus_Map_Control() {
   MODBUS_MAP_t *pMODBUS = (MODBUS_MAP_t*) DataBase_Get_pMODBUS_Data();
   SET_DATA_t *pELTop = (SET_DATA_t*) DataBase_Get_Setting_Data();
@@ -1020,16 +1032,16 @@ void Update_Modbus_Map_Control() {
 
   pMODBUS->Control.levelData[0] = pELTop->levData.selectedSensorA;
   pMODBUS->Control.levelData[1] = pELTop->levData.aMeterCal;
-  pMODBUS->Control.levelData[2] = pELTop->levData.aStopMeterSet;
-  pMODBUS->Control.levelData[3] = pELTop->levData.aStartMeterSet;
+  pMODBUS->Control.levelData[2] = pELTop->levData.aStartMeterSet;
+  pMODBUS->Control.levelData[3] = pELTop->levData.aStopMeterSet;
   pMODBUS->Control.levelData[4] = pELTop->levData.aDownLimitMeterSet;
   pMODBUS->Control.levelData[5] = pELTop->levData.aUpLimitMeterSet;
   pMODBUS->Control.levelData[6] = pELTop->levData.aPumpSwitchTimeSet;
   pMODBUS->Control.levelData[7] = pELTop->levData.aPumpDelaySet;
   pMODBUS->Control.levelData[8] = pELTop->levData.selectedSensorB;
   pMODBUS->Control.levelData[9] = pELTop->levData.bMeterCal;
-  pMODBUS->Control.levelData[10] = pELTop->levData.bStopMeterSet;
-  pMODBUS->Control.levelData[11] = pELTop->levData.bStartMeterSet;
+  pMODBUS->Control.levelData[10] = pELTop->levData.bStartMeterSet;
+  pMODBUS->Control.levelData[11] = pELTop->levData.bStopMeterSet;
   pMODBUS->Control.levelData[12] = pELTop->levData.bDownLimitMeterSet;
   pMODBUS->Control.levelData[13] = pELTop->levData.bUpLimitMeterSet;
   pMODBUS->Control.levelData[14] = pELTop->levData.bPumpSwitchTimeSet;

@@ -235,7 +235,7 @@ typedef struct {
   _RTC rtc;
   uint8_t rtcStep;
   uint8_t errorCnt;
-  uint16_t rtcCnt;
+  uint32_t rtcCnt;
   float rtcTemp;
   uint8_t rtcStatus;
 } _RTC_DATA;
@@ -251,7 +251,7 @@ typedef struct {
 } _DAC_DATA;
 
 typedef struct {
-  double levelVolt[2][10];
+  uint16_t levelVolt[2][50];
   double levelVoltAvg[2];
   double levelSensorCur[2];
   double levelSensor[2];
