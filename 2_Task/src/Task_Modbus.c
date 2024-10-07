@@ -1047,10 +1047,19 @@ void Update_Modbus_Map_Control() {
   pMODBUS->Control.levelData[14] = pELTop->levData.bPumpSwitchTimeSet;
   pMODBUS->Control.levelData[15] = pELTop->levData.bPumpDelaySet;
 
-  pMODBUS->Control.pt100DAC[0] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[0]) + 400;
-  pMODBUS->Control.pt100DAC[1] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[1]) + 400;
-  pMODBUS->Control.pt100DAC[2] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[2]) + 400;
-  pMODBUS->Control.pt100DAC[3] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[3]) + 400;
+  for (uint8_t i = 0; i < 4; i++) {
+    if (pSystem->pt100Value.pt100Cal[i] <= -20) {
+      pMODBUS->Control.pt100DAC[i] = (int16_t) ((float) 6.4 * -20) + 400;
+    } else if (pSystem->pt100Value.pt100Cal[i] <= 280) {
+      pMODBUS->Control.pt100DAC[i] = (int16_t) ((float) 6.4 * pSystem->pt100Value.pt100Cal[i]) + 400;
+    } else {
+      pMODBUS->Control.pt100DAC[i] = (int16_t) ((float) 6.4 * 280) + 400;
+    }
+  }
+  // pMODBUS->Control.pt100DAC[0] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[0]) + 400;
+  // pMODBUS->Control.pt100DAC[1] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[1]) + 400;
+  // pMODBUS->Control.pt100DAC[2] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[2]) + 400;
+  // pMODBUS->Control.pt100DAC[3] = (uint16_t) (6.4 * pSystem->pt100Value.pt100Cal[3]) + 400;
 }
 
 void Update_Modbus_Map(void) {

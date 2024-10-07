@@ -157,7 +157,7 @@ void APtControl(SET_DATA_t *pELTop) {
     switch (AptOnFlag) {
       case 0:
         AptOnFlag = 1;
-        APt_Control(ON);
+        APt_Control(OFF);
         ptTimeSave = pELTop->levData.aPumpSwitchTimeSet * 60 * 60 * 10;
         break;
       case 1:
@@ -166,7 +166,7 @@ void APtControl(SET_DATA_t *pELTop) {
         } else {
           AptOnFlag = 2;
           ptTimeSave = pELTop->levData.aPumpSwitchTimeSet * 60 * 60 * 10;
-          APt_Control(OFF);
+          APt_Control(ON);
         }
         break;
       case 2:
@@ -175,7 +175,7 @@ void APtControl(SET_DATA_t *pELTop) {
         } else {
           AptOnFlag = 1;
           ptTimeSave = pELTop->levData.aPumpSwitchTimeSet * 60 * 60 * 10;
-          APt_Control(ON);
+          APt_Control(OFF);
         }
         break;
     }
@@ -192,7 +192,7 @@ void BPtControl(SET_DATA_t *pELTop) {
     switch (BptOnFlag) {
       case 0:
         BptOnFlag = 1;
-        BPt_Control(ON);
+        BPt_Control(OFF);
         ptTimeSave = pELTop->levData.bPumpSwitchTimeSet * 60 * 60 * 10;
         break;
       case 1:
@@ -201,7 +201,7 @@ void BPtControl(SET_DATA_t *pELTop) {
         } else {
           BptOnFlag = 2;
           ptTimeSave = pELTop->levData.bPumpSwitchTimeSet * 60 * 60 * 10;
-          BPt_Control(OFF);
+          BPt_Control(ON);
         }
         break;
       case 2:
@@ -210,7 +210,7 @@ void BPtControl(SET_DATA_t *pELTop) {
         } else {
           BptOnFlag = 1;
           ptTimeSave = pELTop->levData.bPumpSwitchTimeSet * 60 * 60 * 10;
-          BPt_Control(ON);
+          BPt_Control(OFF);
         }
         break;
     }

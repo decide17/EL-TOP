@@ -150,9 +150,9 @@ void StandByLedDisplay(SYSTEM_t *pSystem, uint8_t displayCase) {
 void StandByTempDisplay(SYSTEM_t *pSystem, uint8_t displayCase) {
   char read_str[10];
 
-  if (pSystem->pt100Value.pt100Cal[displayCase * 2] < -99) {
+  if (pSystem->pt100Value.pt100Cal[displayCase * 2] <= -21) {
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "Sht");
-  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] < 280) {
+  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] <= 281) {
     if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 10) {
       snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2]);
     } else if (pSystem->pt100Value.pt100Cal[displayCase * 2] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2] < 100) {
@@ -166,9 +166,9 @@ void StandByTempDisplay(SYSTEM_t *pSystem, uint8_t displayCase) {
   } else {
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "---");
   }
-  if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < -99) {
+  if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] <= -21) {
     tm1639Display_str(&tm1639_io3, IO3_AB_BR_FND, "Sht");
-  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 280) {
+  } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] <= 281) {
     if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 0 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 10) {
       snprintf(read_str, sizeof(read_str), "  %d", (int) pSystem->pt100Value.pt100Cal[displayCase * 2 + 1]);
     } else if (pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] >= 10 && pSystem->pt100Value.pt100Cal[displayCase * 2 + 1] < 100) {
@@ -199,8 +199,8 @@ void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
       ////////////////////////////////////////
       /////////////////////////////// 디버깅용
       ///////////////////////////////////////
-      snprintf(read_str, sizeof(read_str), "%.2f", (double) pSystem->adcValue.levelVoltAvg[0]);
-      tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
+      // snprintf(read_str, sizeof(read_str), "%.2f", (double) pSystem->adcValue.levelVoltAvg[0]);
+      // tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
       //////////////////////////////////////////
     } else {
       tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
@@ -534,7 +534,8 @@ void firstSetup(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     BUZZER_Control(ON, 100);
     pELTop->remoteData.tempStep = 1;
     tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-L");
-    tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStopMeterSet);
+    tm1639Display_float(&tm1639_io3, IO3_AB_BR_FND, ((float) pELTop->levData.aStartMeterSet / 100));
+    // tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStartMeterSet);
     RESET_BUTTON(pSystem);
   } else if (pSystem->buttonVaule.NAME_FIELD.Button_DOWN5chk) {
     pELTop->remoteData.setData = RTC_SET;
@@ -704,22 +705,26 @@ void Remote_Control(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
         switch (pELTop->remoteData.tempStep) {
           case 1:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-H");
-            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStartMeterSet);
+            // tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStopMeterSet);
+            tm1639Display_float(&tm1639_io3, IO3_AB_BR_FND, ((float) pELTop->levData.aStopMeterSet / 100));
             pELTop->remoteData.tempStep++;
             break;
           case 2:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-L");
-            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStopMeterSet);
+            // tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStartMeterSet);
+            tm1639Display_float(&tm1639_io3, IO3_AB_BR_FND, ((float) pELTop->levData.bStartMeterSet / 100));
             pELTop->remoteData.tempStep++;
             break;
           case 3:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "b-H");
-            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStartMeterSet);
+            // tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.bStopMeterSet);
+            tm1639Display_float(&tm1639_io3, IO3_AB_BR_FND, ((float) pELTop->levData.bStopMeterSet / 100));
             pELTop->remoteData.tempStep++;
             break;
           case 4:
             tm1639Display_str(&tm1639_io4, IO4_AB_MO_FND, "A-L");
-            tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStopMeterSet);
+            // tm1639Display_num(&tm1639_io3, IO3_AB_BR_FND, pELTop->levData.aStartMeterSet);
+            tm1639Display_float(&tm1639_io3, IO3_AB_BR_FND, ((float) pELTop->levData.aStartMeterSet / 100));
             pELTop->remoteData.tempStep = 1;
             break;
         }
