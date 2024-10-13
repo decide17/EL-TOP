@@ -145,8 +145,11 @@ void LevelAdcFlow(SYSTEM_t *pSystem) {
       break;
     case 3:
       for (uint8_t i = 0; i < 2; i++) {
-        pSystem->adcValue.levelSensorCur[i] = (0.4744 * pSystem->adcValue.levelVoltAvg[i] * pSystem->adcValue.levelVoltAvg[i])
-            + (8.1836 * pSystem->adcValue.levelVoltAvg[i]) + 0.3617;
+//        pSystem->adcValue.levelSensorCur[i] = (0.4744 * pSystem->adcValue.levelVoltAvg[i] * pSystem->adcValue.levelVoltAvg[i])
+//            + (8.1836 * pSystem->adcValue.levelVoltAvg[i]) + 0.3617;
+
+        pSystem->adcValue.levelSensorCur[i] = (-0.066 * pSystem->adcValue.levelVoltAvg[i] * pSystem->adcValue.levelVoltAvg[i])
+            + (10.283 * pSystem->adcValue.levelVoltAvg[i]) - 0.0464;
       }
 
       pSystem->adcValue.levelSensor[0] = (0.0625 * pSystem->adcValue.levelSensorCur[0] - 0.25) * ((double) pELTop->levData.selectedSensorA / 100);

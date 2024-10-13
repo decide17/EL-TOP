@@ -189,7 +189,7 @@ void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
 
   if (pELTop->userData.channel == 0) {
     if (pSystem->adcValue.levelSensorCur[0] >= 4) {
-      if (pSystem->adcValue.levelSensorCur[0] >= pELTop->levData.selectedSensorA) {
+      if (pSystem->adcValue.levelSensorCal[0] >= pELTop->levData.selectedSensorA) {
         snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorA / 100));
         tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
       } else {
@@ -207,7 +207,7 @@ void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     }
   } else if (pELTop->userData.channel == 1) {
     if (pSystem->adcValue.levelSensorCur[1] >= 4) {
-      if (pSystem->adcValue.levelSensorCur[1] >= pELTop->levData.selectedSensorB) {
+      if (pSystem->adcValue.levelSensorCal[1] >= pELTop->levData.selectedSensorB) {
         snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorB / 100));
         tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
       } else {
@@ -219,7 +219,7 @@ void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
     }
   } else {
     if (pSystem->adcValue.levelSensorCur[0] >= 4) {
-      if (pSystem->adcValue.levelSensorCur[0] >= pELTop->levData.selectedSensorA) {
+      if (pSystem->adcValue.levelSensorCal[0] >= pELTop->levData.selectedSensorA) {
         snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorA / 100));
         tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, read_str);
       } else {
@@ -230,7 +230,7 @@ void StandByLevelDisplay(SYSTEM_t *pSystem, SET_DATA_t *pELTop) {
       tm1639Display_str(&tm1639_io3, IO3_A_LEVEL_FND, "---");
     }
     if (pSystem->adcValue.levelSensorCur[1] >= 4) {
-      if (pSystem->adcValue.levelSensorCur[1] >= pELTop->levData.selectedSensorB) {
+      if (pSystem->adcValue.levelSensorCal[1] >= pELTop->levData.selectedSensorB) {
         snprintf(read_str, sizeof(read_str), "%.2f", ((double) pELTop->levData.selectedSensorB / 100));
         tm1639Display_str(&tm1639_io4, IO4_B_LEVEL_FND, read_str);
       } else {

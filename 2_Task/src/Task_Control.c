@@ -227,9 +227,8 @@ void AMoControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
     if (pELTop->userData.AutoReset == 0)
       return;
   }
-  if (pSystem->pt100Value.pt100Cal[0] >= 300) {
-    if (pELTop->userData.AutoReset == 0)
-      pSystem->outputValue.NAME_FIELD.aMoFlag = 0;
+  if (pSystem->pt100Value.pt100Cal[0] >= 280) {
+    pSystem->outputValue.NAME_FIELD.aMoFlag = 0;
     AMoDelay = pELTop->userData.TripOnDelay * 10;
   } else if (pSystem->pt100Value.pt100Cal[0] <= -99) {
     if (AMoDelay) {
@@ -255,9 +254,8 @@ void ABrControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
     if (pELTop->userData.AutoReset == 0)
       return;
   }
-  if (pSystem->pt100Value.pt100Cal[1] >= 300) {
-    if (pELTop->userData.AutoReset == 0)
-      pSystem->outputValue.NAME_FIELD.aBrFlag = 0;
+  if (pSystem->pt100Value.pt100Cal[1] >= 280) {
+    pSystem->outputValue.NAME_FIELD.aBrFlag = 0;
     ABrDelay = pELTop->userData.TripOnDelay * 10;
   } else if (pSystem->pt100Value.pt100Cal[1] <= -99) {
     if (ABrDelay) {
@@ -283,9 +281,8 @@ void BMoControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
     if (pELTop->userData.AutoReset == 0)
       return;
   }
-  if (pSystem->pt100Value.pt100Cal[2] >= 300) {
-    if (pELTop->userData.AutoReset == 0)
-      pSystem->outputValue.NAME_FIELD.bMoFlag = 0;
+  if (pSystem->pt100Value.pt100Cal[2] >= 280) {
+    pSystem->outputValue.NAME_FIELD.bMoFlag = 0;
     BMoDelay = pELTop->userData.TripOnDelay * 10;
   } else if (pSystem->pt100Value.pt100Cal[2] <= -99) {
     if (BMoDelay) {
@@ -311,9 +308,8 @@ void BBrControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
     if (pELTop->userData.AutoReset == 0)
       return;
   }
-  if (pSystem->pt100Value.pt100Cal[3] >= 300) {
-    if (pELTop->userData.AutoReset == 0)
-      pSystem->outputValue.NAME_FIELD.bBrFlag = 0;
+  if (pSystem->pt100Value.pt100Cal[3] >= 280) {
+    pSystem->outputValue.NAME_FIELD.bBrFlag = 0;
     BBrDelay = pELTop->userData.TripOnDelay * 10;
   } else if (pSystem->pt100Value.pt100Cal[3] <= -99) {
     if (BBrDelay) {
@@ -580,11 +576,25 @@ void RelayLEDControl(SET_DATA_t *pELTop, SYSTEM_t *pSystem) {
       tm1639_io4.data.NAME_FIELD.LED1_RED = 0;
     }
 
+    if (pSystem->outputValue.NAME_FIELD.aBrFlag == 1) {
+      pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 1;
+    } else {
+      pSystem->setValue.NAME_FIELD.ABR_RED_TOGGLE = 0;
+      tm1639_io3.data.NAME_FIELD.LED8_RED = 0;
+    }
+
     if (pSystem->outputValue.NAME_FIELD.bMoFlag == 1) {
       pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 1;
     } else {
       pSystem->setValue.NAME_FIELD.BMO_RED_TOGGLE = 0;
       tm1639_io4.data.NAME_FIELD.LED2_RED = 0;
+    }
+
+    if (pSystem->outputValue.NAME_FIELD.bBrFlag == 1) {
+      pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 1;
+    } else {
+      pSystem->setValue.NAME_FIELD.BBR_RED_TOGGLE = 0;
+      tm1639_io3.data.NAME_FIELD.LED7_RED = 0;
     }
 
     if (pSystem->outputValue.NAME_FIELD.aLLFlag == 1) {

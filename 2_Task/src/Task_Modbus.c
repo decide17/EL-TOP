@@ -980,10 +980,16 @@ void Update_Modbus_Map_Control() {
 
   pMODBUS->Control.InputStatus = pSystem->inputValue.NAME_FIELD.waterSen1;
   pMODBUS->Control.InputStatus |= (pSystem->inputValue.NAME_FIELD.waterSen2 << 1);
-  pMODBUS->Control.Pt100Value[0] = (int16_t) pSystem->pt100Value.pt100Cal[0];
-  pMODBUS->Control.Pt100Value[1] = (int16_t) pSystem->pt100Value.pt100Cal[1];
-  pMODBUS->Control.Pt100Value[2] = (int16_t) pSystem->pt100Value.pt100Cal[2];
-  pMODBUS->Control.Pt100Value[3] = (int16_t) pSystem->pt100Value.pt100Cal[3];
+
+  for (int i = 0; i < 4; i++) {
+    if (pSystem->pt100Value.pt100Cal[i] < -20.0) {
+      pMODBUS->Control.Pt100Value[i] = -20;
+    } else if (pSystem->pt100Value.pt100Cal[i] > 280.0) {
+      pMODBUS->Control.Pt100Value[i] = 280;
+    } else {
+      pMODBUS->Control.Pt100Value[i] = (int16_t) pSystem->pt100Value.pt100Cal[i];
+    }
+  }
   pMODBUS->Control.LevelSensor[0] = (int16_t) pSystem->adcValue.levelSensorCal[0];
   pMODBUS->Control.LevelSensor[1] = (int16_t) pSystem->adcValue.levelSensorCal[1];
 
