@@ -10,8 +10,8 @@
 
 #include "cmsis_os.h"
 #include "com_uart.h"
-#include "stm32_ds3231.h"
-#include "mcp4728.h"
+//#include "stm32_ds3231.h"
+//#include "mcp4728.h"
 
 #define _SW_VERSION_MAJOR 1
 #define _SW_VERSION_MINOR 0
@@ -232,7 +232,7 @@ typedef union {
 } _OUTPUT_STATUS;
 
 typedef struct {
-  _RTC rtc;
+//  _RTC rtc;
   uint8_t rtcStep;
   uint8_t errorCnt;
   uint32_t rtcCnt;
@@ -247,7 +247,7 @@ typedef struct {
 } _PT100_DATA;
 
 typedef struct {
-  dacChannelConfig mcp4728;
+//  dacChannelConfig mcp4728;
 } _DAC_DATA;
 
 typedef struct {

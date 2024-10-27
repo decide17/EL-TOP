@@ -7,7 +7,6 @@
 #include "database.h"
 #include <stdlib.h>
 #include "Task_Input.h"
-#include "Task_Cli.h"
 #include "com_flash.h"
 
 static FLASH_EraseInitTypeDef EraseInitStruct;

@@ -6,16 +6,10 @@
  */
 
 #include "database.h"
-#include "Task_Modbus.h"
 #include "com_flash.h"
 
-static MODBUS_MAP_t MODBUS_Data;
 static SYSTEM_t SystemData;
 static SET_DATA_t ELTopData;
-
-uint32_t DataBase_Get_pMODBUS_Data(void) {
-  return (uint32_t) &MODBUS_Data;
-}
 
 uint32_t DataBase_Get_pInfo_Data(void) {
   return (uint32_t) &SystemData;

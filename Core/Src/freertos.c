@@ -26,11 +26,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "database.h"
-#include "Task_Cli.h"
+//#include "Task_Cli.h"
 #include "Task_Input.h"
-#include "Task_Modbus.h"
-#include "Task_SdCard.h"
-#include "Task_Control.h"
+//#include "Task_Modbus.h"
+//#include "Task_SdCard.h"
+//#include "Task_Control.h"
 #include "Task_Remote.h"
 /* USER CODE END Includes */
 
