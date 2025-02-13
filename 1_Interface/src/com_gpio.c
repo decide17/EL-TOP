@@ -15,7 +15,6 @@ typedef struct {
 } input_t;
 
 
-
 typedef struct {
   GPIO_TypeDef *port;
   uint16_t pin;

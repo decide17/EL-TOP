@@ -64,6 +64,7 @@ void LevelAdcFlow(SYSTEM_t *pSystem) {
           + pSystem->adcValue.levelVolt[1][27]) / 4 / 4096 * 3.3;
       LevelAdcStep++;
       break;
+      
     case 3:
       for (uint8_t i = 0; i < 2; i++) {
 //        pSystem->adcValue.levelSensorCur[i] = (0.4744 * pSystem->adcValue.levelVoltAvg[i] * pSystem->adcValue.levelVoltAvg[i])
